@@ -25,12 +25,16 @@ class Agent:
     def __init__(self, config: Config | None = None, client: OllamaClient | None = None,
                  confirm: Callable[[str], bool] | None = None,
                  on_event: Callable[[str], None] | None = None,
-                 options: dict | None = None):
+                 options: dict | None = None,
+                 system_prompt: str | None = None):
         self.config = config or Config()
         self.client = client or OllamaClient(self.config)
         self.tools = Toolbox(self.config, self.client, confirm)
         self.on_event = on_event or (lambda _msg: None)
-        self._system_prompt = with_memory(SYSTEM_PROMPT, self.config)
+        # Prompt système de base : celui par défaut, ou un sur-mesure (ex :
+        # mode codex-terminal, orienté commandes shell).
+        self._base_prompt = system_prompt or SYSTEM_PROMPT
+        self._system_prompt = with_memory(self._base_prompt, self.config)
         self.messages: list[dict] = [{"role": "system", "content": self._system_prompt}]
         # Réglages de génération (température, etc.) — voir params.py. Partagé par
         # référence avec l'appelant, pour que /temp change aussi les prochains tours.
@@ -38,7 +42,7 @@ class Agent:
 
     def reset(self) -> None:
         # Relit la mémoire partagée, au cas où /retenir l'aurait changée.
-        self._system_prompt = with_memory(SYSTEM_PROMPT, self.config)
+        self._system_prompt = with_memory(self._base_prompt, self.config)
         self.messages = [{"role": "system", "content": self._system_prompt}]
 
     def run(self, user_message: str) -> str:

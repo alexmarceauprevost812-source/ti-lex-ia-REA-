@@ -58,12 +58,27 @@ GREEN = "#4bd07a"
 BLUE = "#5fb0ff"
 RED = "#ff5f56"
 
+CODEX_TERM_SYSTEM = (
+    "Tu es Codex-Terminal, l'assistant shell de Ti-Lex. Tu aides à écrire et à "
+    "lancer des commandes et des fonctions dans le terminal, dans le dossier de "
+    "travail. Utilise l'outil run_command pour exécuter, et list_files/read_file/"
+    "write_file pour les fichiers. Avant une commande qui modifie ou supprime, "
+    "explique en une ligne ce qu'elle fait. Montre la commande exacte, lance-la, "
+    "puis résume le résultat. Ne prétends jamais avoir exécuté quelque chose que "
+    "tu n'as pas lancé. Préfère des commandes simples et sûres."
+)
+
+# L'agent complet sert à REA et à Codex-Terminal (tous deux utilisent des outils).
+AGENT_MODES = {"rea", "codexterm"}
+
 # (clé, titre, sous-titre, prompt système, (env, défaut principal), (env, repli))
 MODES = {
     "chat": ("Chat", "conversation générale", CHAT_SYSTEM,
              ("TILEX_CHAT_MODEL", "qwen3:8b"), ("TILEX_CHAT_FALLBACK", FALLBACK_CHAT)),
     "codex": ("Codex", "assistant de code", CODEX_SYSTEM,
               ("TILEX_CODEX_MODEL", "qwen2.5-coder:7b"), ("TILEX_CODEX_FALLBACK", FALLBACK_CODEX)),
+    "codexterm": ("Codex-Terminal", "aide et lance des commandes shell", CODEX_TERM_SYSTEM,
+                  ("TILEX_CODEX_MODEL", "qwen2.5-coder:7b"), ("TILEX_CODEX_FALLBACK", FALLBACK_CODEX)),
     "rea": ("REA", "agent complet — web, vision, fichiers", None,
             ("TILEX_REA_MODEL", "heretic:latest"), ("TILEX_REA_FALLBACK", FALLBACK_REA)),
     "heretic": ("Heretic", "chat direct, sans filtre", HERETIC_SYSTEM,
@@ -311,11 +326,13 @@ class LexOSApp:
         self.view.configure(state="disabled")
         key = self.mode_key
         system = MODES[key][2]
-        if key == "rea":
-            # Le vrai agent complet : outils web/vision/fichiers/commandes, avec
-            # une vraie confirmation à l'écran pour les actions qui modifient.
+        if key in AGENT_MODES:
+            # Agent complet avec outils (web/vision/fichiers/commandes) et une
+            # vraie confirmation à l'écran. REA utilise le prompt par défaut ;
+            # Codex-Terminal utilise son prompt shell (MODES[key][2]).
             self.agent = Agent(self.config, self.client, confirm=self._gui_confirm,
-                               on_event=lambda m: self.queue.put(("tool", m + "\n")))
+                               on_event=lambda m: self.queue.put(("tool", m + "\n")),
+                               system_prompt=system)
             self.messages = []
         else:
             self.agent = None

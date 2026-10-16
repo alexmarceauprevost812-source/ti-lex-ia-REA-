@@ -29,8 +29,10 @@ def test_choose_none_when_empty():
     assert "Aucun" in note
 
 
-def test_modes_cover_the_four_choices():
-    assert set(MODES) == {"chat", "codex", "rea", "heretic"}
+def test_modes_cover_all_choices():
+    assert set(MODES) == {"chat", "codex", "codexterm", "rea", "heretic"}
     # REA n'a pas de prompt système fixe (il utilise celui de l'agent).
     assert MODES["rea"][2] is None
+    # Codex-Terminal a un prompt shell.
+    assert "run_command" in MODES["codexterm"][2]
     assert MODES["heretic"][3] == ("TILEX_HERETIC_MODEL", "heretic:latest")
