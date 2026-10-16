@@ -93,7 +93,7 @@ def copy_model(source: Path, dest: Path, name: str, copied_blobs: set[str]) -> b
     rel_manifest = manifest_path.relative_to(source)
     copy_as_regular_file(manifest_path, dest / rel_manifest)
 
-    # 2. Copier chaque blob référencé (en sautant ceux déjà copiés pour un autre modèle).
+    # 2. Copier chaque blob référencé (en sautant ceux déjà présents).
     total = 0
     blobs_dir_src = source / "blobs"
     for digest in blob_digests(manifest_data):
@@ -104,10 +104,20 @@ def copy_model(source: Path, dest: Path, name: str, copied_blobs: set[str]) -> b
         if not blob_src.exists():
             print(f"  ! {name} : blob manquant sur le PC : {blob_name}")
             continue
-        total += copy_as_regular_file(blob_src, dest / "blobs" / blob_name)
+        blob_dst = dest / "blobs" / blob_name
+        src_size = blob_src.stat().st_size
+        # Déjà copié (même taille) ? On le saute : re-lancer l'outil devient
+        # rapide et reprend là où une copie précédente s'est arrêtée.
+        if blob_dst.exists() and blob_dst.stat().st_size == src_size:
+            copied_blobs.add(blob_name)
+            continue
+        # Signe de vie avant un gros fichier (sinon ça a l'air figé plusieurs minutes).
+        if src_size > 1e9:
+            print(f"    copie de {src_size / 1e9:.1f} Go pour {name}... (patiente)", flush=True)
+        total += copy_as_regular_file(blob_src, blob_dst)
         copied_blobs.add(blob_name)
 
-    print(f"  ✓ {name}  (+{total / 1e9:.1f} Go de nouveaux blobs)")
+    print(f"  ✓ {name}  (+{total / 1e9:.1f} Go de nouveaux blobs)", flush=True)
     return True
 
 
