@@ -98,4 +98,6 @@ if [ ! -d "deps/ti_lex_agent" ]; then
     exit 1
 fi
 export PYTHONPATH="$CLE/ti-lex-ia-REA-/deps${PYTHONPATH:+:$PYTHONPATH}"
-exec python3 -m ti_lex_agent.launcher
+# On lance d'abord la fenêtre graphique (la vraie appli). Si elle ne peut pas
+# s'ouvrir (pas d'écran, ou python3-tk absent), on retombe sur le menu texte.
+python3 -m ti_lex_agent.gui || python3 -m ti_lex_agent.launcher

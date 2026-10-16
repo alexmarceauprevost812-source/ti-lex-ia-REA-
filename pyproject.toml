@@ -13,6 +13,7 @@ ti-lex-agent = "ti_lex_agent.cli:main"
 # Pas "lexos-pro" : ce nom est déjà pris par l'appli de Paramètres LexOS
 # existante (PySide6) et entrait en conflit avec elle.
 lexos-ia = "ti_lex_agent.launcher:main"
+lexos-gui = "ti_lex_agent.gui:main"
 
 [build-system]
 requires = ["setuptools>=68"]
