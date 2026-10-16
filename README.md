@@ -170,14 +170,19 @@ travail ; change l'emplacement avec `TILEX_MEMORY` pour le garder sur la clé US
 Supprimer avant de confirmer que ça marche te laisse sans aucun modèle nulle part.
 
 **1. Copie les modèles Ollama du disque interne vers la clé** (remplace le chemin par
-l'endroit où ta clé est montée). On met `--no-owner --no-group --no-perms` parce
-qu'exFAT ne gère pas les propriétaires/permissions Unix : sans ces options, `rsync`
-affiche plein de `chown ... Operation not permitted` (sans gravité, le contenu se copie
-quand même, mais c'est plus propre de les enlever) :
+l'endroit où ta clé est montée). Deux options importantes :
+- **`-L`** : Ollama range ses manifestes comme des **liens symboliques**. Sans `-L`,
+  `rsync` les saute (`skipping non-regular file "manifests-v2/..."`) et la clé se
+  retrouve sans aucun manifeste → Ollama démarre avec « total blobs: 0 » et ne voit
+  aucun modèle. `-L` suit chaque lien et copie le vrai fichier derrière, en fichier
+  normal — ce qu'exFAT accepte (exFAT ne peut pas stocker un lien symbolique).
+- **`--no-owner --no-group --no-perms`** : exFAT ne gère pas les propriétaires/
+  permissions Unix ; sans ça, `rsync` affiche plein de `chown ... Operation not
+  permitted` (sans gravité, mais inutiles).
 ```bash
 rm -rf /media/marceau/LEXOS/ollama-models
 mkdir -p /media/marceau/LEXOS/ollama-models
-sudo rsync -rtv --no-owner --no-group --no-perms --progress \
+sudo rsync -rtvL --no-owner --no-group --no-perms --progress \
     /usr/share/ollama/.ollama/models/ /media/marceau/LEXOS/ollama-models/
 ```
 **Laisse le copiage finir COMPLÈTEMENT** (il affiche les gros `blobs/` en premier, les

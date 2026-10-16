@@ -17,18 +17,24 @@ if [ -z "$CLE" ] || [ ! -d "$CLE" ]; then
 fi
 
 MODELS="$CLE/ollama-models"
-# On vérifie qu'il y a VRAIMENT au moins un fichier de manifeste dedans, pas
-# juste que le dossier existe : un rsync interrompu en cours de route peut
-# créer manifests/ vide, et Ollama afficherait alors "total blobs: 0" sans
-# aucune erreur claire.
-if [ ! -d "$MODELS/manifests" ] || [ -z "$(find "$MODELS/manifests" -type f -print -quit 2>/dev/null)" ]; then
-    echo "Erreur : $MODELS/manifests est absent ou vide (0 fichier de manifeste)."
-    echo "La copie des modèles a probablement été interrompue avant la fin. Recommence :"
-    echo "  rm -rf $MODELS"
-    echo "  sudo rsync -av --progress /usr/share/ollama/.ollama/models/ $MODELS/"
-    echo "  (attends qu'elle finisse complètement, puis vérifie :"
-    echo "   du -sh $MODELS   # doit être proche de la taille sur le disque interne"
-    echo "   find $MODELS/manifests -type f | wc -l   # doit être > 0)"
+# On vérifie qu'il y a VRAIMENT au moins un fichier de manifeste, pas juste
+# que le dossier existe. Deux pièges fréquents :
+#  - un rsync interrompu avant la fin laisse manifests/ vide ;
+#  - Ollama range ses manifestes en liens symboliques, et "rsync" sans -L les
+#    saute ("skipping non-regular file") → clé sans manifeste.
+# Dans les deux cas Ollama démarre avec "total blobs: 0" sans erreur claire.
+# Selon la version d'Ollama, les manifestes sont dans "manifests" ou
+# "manifests-v2" : on accepte l'un ou l'autre.
+NB_MANIFESTS=$(find "$MODELS/manifests" "$MODELS/manifests-v2" -type f 2>/dev/null | wc -l)
+if [ "$NB_MANIFESTS" -eq 0 ]; then
+    echo "Erreur : aucun fichier de manifeste trouvé dans $MODELS."
+    echo "Soit la copie a été interrompue, soit rsync a sauté les liens symboliques"
+    echo "(il faut l'option -L). Recommence la copie complète :"
+    echo "  rm -rf $MODELS && mkdir -p $MODELS"
+    echo "  sudo rsync -rtvL --no-owner --no-group --no-perms --progress \\"
+    echo "      /usr/share/ollama/.ollama/models/ $MODELS/"
+    echo "  (laisse-la finir, puis vérifie :"
+    echo "   find $MODELS/manifests $MODELS/manifests-v2 -type f | wc -l   # doit être > 0)"
     exit 1
 fi
 
