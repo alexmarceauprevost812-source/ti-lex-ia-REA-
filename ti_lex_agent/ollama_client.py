@@ -19,7 +19,7 @@ class OllamaClient:
         self.config = config
 
     def chat(self, messages: list[dict], tools: list[dict] | None = None,
-             model: str | None = None) -> dict:
+             model: str | None = None, options: dict | None = None) -> dict:
         """Envoie une conversation et retourne le message de réponse du modèle."""
         payload: dict = {
             "model": model or self.config.model,
@@ -28,6 +28,8 @@ class OllamaClient:
         }
         if tools:
             payload["tools"] = tools
+        if options:
+            payload["options"] = options
         try:
             r = requests.post(
                 f"{self.config.ollama_host}/api/chat",

@@ -23,12 +23,16 @@ de fichiers et commandes dans le dossier du projet.
 class Agent:
     def __init__(self, config: Config | None = None, client: OllamaClient | None = None,
                  confirm: Callable[[str], bool] | None = None,
-                 on_event: Callable[[str], None] | None = None):
+                 on_event: Callable[[str], None] | None = None,
+                 options: dict | None = None):
         self.config = config or Config()
         self.client = client or OllamaClient(self.config)
         self.tools = Toolbox(self.config, self.client, confirm)
         self.on_event = on_event or (lambda _msg: None)
         self.messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
+        # Réglages de génération (température, etc.) — voir params.py. Partagé par
+        # référence avec l'appelant, pour que /temp change aussi les prochains tours.
+        self.options: dict = options if options is not None else {}
 
     def reset(self) -> None:
         self.messages = self.messages[:1]
@@ -37,7 +41,7 @@ class Agent:
         """Traite une demande de l'utilisateur et retourne la réponse finale."""
         self.messages.append({"role": "user", "content": user_message})
         for _ in range(self.config.max_steps):
-            reply = self.client.chat(self.messages, tools=TOOL_SCHEMAS)
+            reply = self.client.chat(self.messages, tools=TOOL_SCHEMAS, options=self.options)
             self.messages.append(reply)
             calls = reply.get("tool_calls") or []
             if not calls:

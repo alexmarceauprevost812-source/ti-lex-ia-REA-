@@ -14,7 +14,7 @@ class FakeClient:
         self.replies = list(replies)
         self.seen = []
 
-    def chat(self, messages, tools=None, model=None):
+    def chat(self, messages, tools=None, model=None, options=None):
         self.seen.append(list(messages))
         return self.replies.pop(0)
 

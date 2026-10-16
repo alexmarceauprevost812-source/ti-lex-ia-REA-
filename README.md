@@ -51,6 +51,22 @@ Exemples de demandes :
 Réglages (variables d'environnement) : `OLLAMA_HOST`, `TILEX_MODEL`, `TILEX_VISION_MODEL`,
 `TILEX_WORKSPACE`.
 
+### Commandes du mode conversation
+
+| Commande | Effet |
+| --- | --- |
+| `/params` | affiche les réglages de génération actuels |
+| `/temp 0.9` | change la température (raccourci de `/param`) |
+| `/param top_p 0.95` | change un autre réglage (`top_k`, `repeat_penalty`, `num_ctx`, `seed`) |
+| `/model <nom>` | change le modèle principal utilisé pour la suite de la conversation |
+| `/heretic <org/modele>` | lance Heretic officiel sur un modèle Hugging Face (demande confirmation) |
+| `/importer <dossier> <nom>` | importe un modèle modifié dans Ollama sous ce nom |
+| `/reset` | oublie la conversation |
+
+La température et les autres réglages s'appliquent tout de suite, à chaque message. Modifier
+les **poids** d'un modèle (avec Heretic) prend plusieurs minutes et crée un nouveau modèle à
+part ; l'original n'est jamais touché.
+
 ## Sécurité
 
 - L'agent ne peut lire et écrire **que dans son dossier de travail** (`workspace/` par défaut).
@@ -66,6 +82,9 @@ bash scripts/install_heretic.sh
 source ~/venvs/heretic/bin/activate
 heretic Qwen/Qwen3-4B-Instruct-2507
 ```
+
+Ou directement depuis l'agent, une fois Heretic installé : `/heretic Qwen/Qwen3-4B-Instruct-2507`
+puis, quand c'est fini, `/importer <dossier-sauvegardé> mon-modele-libre`.
 
 - Heretic charge le modèle **entier** en mémoire graphique. Avec une carte de 8 Go de VRAM,
   prends un petit modèle (4B) et active la quantification 4 bits dans la config
