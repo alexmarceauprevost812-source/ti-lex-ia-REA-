@@ -177,12 +177,15 @@ sudo rsync -av --progress /usr/share/ollama/.ollama/models/ /media/marceau/LEXOS
 ```
 
 **2. Copie aussi le projet sur la clé** (pour qu'il n'ait plus besoin du disque interne).
-Une clé formatée exFAT/FAT ne supporte pas les liens symboliques qu'un `.venv` utilise :
-exclus-le de la copie, et recrée-le directement sur la clé avec `--copies` :
+Une clé formatée exFAT/FAT ne supporte pas les liens symboliques — et `python3 -m venv`
+en crée toujours un (`lib64`), **même avec `--copies`** sur Debian/LexOS Pro, donc un
+`.venv` ne peut pas vivre sur la clé. On n'en a pas besoin : `pip install --target`
+installe le projet et ses dépendances comme de simples fichiers, dans un dossier à
+côté, sans aucun lien symbolique :
 ```bash
-rsync -a --exclude='.venv' ~/ti-lex-ia-REA-/ /media/marceau/LEXOS/ti-lex-ia-REA-/
+rsync -a --exclude='.venv' --exclude='deps' ~/ti-lex-ia-REA-/ /media/marceau/LEXOS/ti-lex-ia-REA-/
 cd /media/marceau/LEXOS/ti-lex-ia-REA-
-python3 -m venv .venv --copies && source .venv/bin/activate && pip install -e .
+python3 -m pip install --target=deps --upgrade .
 ```
 
 **3. Teste que tout marche DEPUIS LA CLÉ, sans toucher au disque interne** :

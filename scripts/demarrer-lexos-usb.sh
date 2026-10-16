@@ -37,14 +37,40 @@ export OLLAMA_MODELS="$MODELS"
 if ! curl -s -o /dev/null http://localhost:11434/api/tags; then
     echo "Démarrage d'Ollama sur les modèles de la clé..."
     nohup ollama serve >"$CLE/ollama.log" 2>&1 &
-    sleep 2
+    # Une clé USB est plus lente qu'un disque interne : on attend qu'Ollama
+    # réponde vraiment au lieu d'un délai fixe (sinon la liste des modèles
+    # peut apparaître vide alors qu'Ollama démarre encore).
+    for _ in $(seq 1 30); do
+        if curl -s -o /dev/null http://localhost:11434/api/tags; then
+            break
+        fi
+        sleep 1
+    done
 fi
 
 echo "== Modèles disponibles =="
-curl -s http://localhost:11434/api/tags | grep -o '"name":"[^"]*"' || true
+REPONSE=$(curl -s http://localhost:11434/api/tags)
+echo "$REPONSE" | grep -o '"name":"[^"]*"' || true
+if ! echo "$REPONSE" | grep -q '"name":"'; then
+    echo "(aucun modèle trouvé — regarde $CLE/ollama.log si ça persiste)"
+fi
 
 echo
 echo "== Lancement du menu LexOS Pro =="
 cd "$CLE/ti-lex-ia-REA-"
-source .venv/bin/activate
-exec lexos-ia
+
+# Pas de .venv sur la clé : exFAT ne supporte pas les liens symboliques que
+# "python3 -m venv" essaie toujours de créer (même avec --copies, sur
+# Debian/LexOS Pro). On utilise plutôt "pip install --target", qui installe
+# le projet et ses dépendances comme de simples fichiers (aucun lien
+# symbolique, aucun script avec un chemin codé en dur) dans un dossier
+# "deps/" juste à côté. Voir le README, section "Vider le PC".
+if [ ! -d "deps/ti_lex_agent" ]; then
+    echo "Erreur : deps/ n'existe pas ou est incomplet."
+    echo "Lance d'abord, une seule fois, depuis cette clé :"
+    echo "  cd $CLE/ti-lex-ia-REA-"
+    echo "  python3 -m pip install --target=deps --upgrade ."
+    exit 1
+fi
+export PYTHONPATH="$CLE/ti-lex-ia-REA-/deps${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m ti_lex_agent.launcher
