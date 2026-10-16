@@ -17,9 +17,18 @@ if [ -z "$CLE" ] || [ ! -d "$CLE" ]; then
 fi
 
 MODELS="$CLE/ollama-models"
-if [ ! -d "$MODELS/manifests" ]; then
-    echo "Erreur : $MODELS ne contient pas de modèles Ollama (pas de dossier manifests/)."
-    echo "As-tu bien copié /usr/share/ollama/.ollama/models/ vers $MODELS ?"
+# On vérifie qu'il y a VRAIMENT au moins un fichier de manifeste dedans, pas
+# juste que le dossier existe : un rsync interrompu en cours de route peut
+# créer manifests/ vide, et Ollama afficherait alors "total blobs: 0" sans
+# aucune erreur claire.
+if [ ! -d "$MODELS/manifests" ] || [ -z "$(find "$MODELS/manifests" -type f -print -quit 2>/dev/null)" ]; then
+    echo "Erreur : $MODELS/manifests est absent ou vide (0 fichier de manifeste)."
+    echo "La copie des modèles a probablement été interrompue avant la fin. Recommence :"
+    echo "  rm -rf $MODELS"
+    echo "  sudo rsync -av --progress /usr/share/ollama/.ollama/models/ $MODELS/"
+    echo "  (attends qu'elle finisse complètement, puis vérifie :"
+    echo "   du -sh $MODELS   # doit être proche de la taille sur le disque interne"
+    echo "   find $MODELS/manifests -type f | wc -l   # doit être > 0)"
     exit 1
 fi
 
