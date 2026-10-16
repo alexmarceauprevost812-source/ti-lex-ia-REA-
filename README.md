@@ -190,8 +190,19 @@ petits `manifests/` en dernier). Avant de continuer, vérifie que les manifestes
 arrivés — sans eux, Ollama démarre avec « total blobs: 0 » et ne voit aucun modèle :
 ```bash
 du -sh /media/marceau/LEXOS/ollama-models               # doit être proche de la taille source
-find /media/marceau/LEXOS/ollama-models/manifests -type f | wc -l   # doit être > 0
+find /media/marceau/LEXOS/ollama-models/manifests /media/marceau/LEXOS/ollama-models/manifests-v2 -type f | wc -l   # doit être > 0
 ```
+
+**Variante : ne copier QUE certains modèles** (plus rapide et plus léger que de tout
+copier). L'outil `copier-modeles-usb.py` lit le manifeste de chaque modèle demandé et
+ne copie que ses blobs — en suivant les liens symboliques, donc OK pour exFAT :
+```bash
+sudo python3 ~/ti-lex-ia-REA-/scripts/copier-modeles-usb.py \
+    /media/marceau/LEXOS/ollama-models \
+    heretic:latest qwen3:8b qwen2.5vl:7b
+```
+(Mets les noms exacts donnés par `ollama list`. `heretic:latest` est le seul décensuré ;
+`qwen3:8b` sert au Chat, `qwen2.5vl:7b` à la vision/description d'images.)
 
 **2. Copie aussi le projet sur la clé** (pour qu'il n'ait plus besoin du disque interne).
 Une clé formatée exFAT/FAT ne supporte pas les liens symboliques — et `python3 -m venv`
