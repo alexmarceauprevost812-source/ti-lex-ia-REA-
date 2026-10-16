@@ -33,7 +33,16 @@ from .launcher import (
     _has_model,
 )
 from .memory import remember, with_memory
-from .modelops import ModelOpsError, import_to_ollama, run_heretic
+from .modelops import (
+    ModelOpsError,
+    copy_model,
+    create_variant,
+    delete_model,
+    import_to_ollama,
+    pull_model,
+    run_heretic,
+    show_model,
+)
 from .ollama_client import OllamaClient, OllamaError
 from .tools import IMAGE_EXTENSIONS
 
@@ -158,9 +167,9 @@ class LexOSApp:
                 w.bind("<Enter>", lambda _e, c=card: c.configure(highlightbackground=ORANGE))
                 w.bind("<Leave>", lambda _e, c=card: c.configure(highlightbackground=EDGE))
 
-        tk.Button(center, text="Décensurer un modèle (Heretic)", bg=BG, fg=BLUE,
+        tk.Button(center, text="⚙ Gérer les modèles (décensurer, créer, importer…)", bg=BG, fg=BLUE,
                   activebackground=BG, activeforeground=BLUE, bd=0, font=self.f_small,
-                  cursor="hand2", command=self._decensor_dialog).pack(pady=(20, 2))
+                  cursor="hand2", command=self._models_manager).pack(pady=(20, 2))
         tk.Button(center, text="Quitter", bg=BG, fg=MUTED, activebackground=BG,
                   activeforeground=RED, bd=0, font=self.f_small, cursor="hand2",
                   command=self.root.destroy).pack()
@@ -181,13 +190,10 @@ class LexOSApp:
         tk.Button(top, text="Effacer", bg=PANEL, fg=MUTED, activebackground=EDGE,
                   activeforeground=FG, bd=0, font=self.f_body, cursor="hand2",
                   command=lambda: self._reset_conversation(True)).pack(side="right", padx=8)
-        # Outils de modification de modèle — visibles seulement en mode Heretic.
-        self.import_btn = tk.Button(top, text="Importer", bg=PANEL, fg=GREEN,
-                                    activebackground=EDGE, activeforeground=GREEN, bd=0,
-                                    font=self.f_body, cursor="hand2", command=self._import_dialog)
-        self.decensor_btn = tk.Button(top, text="Décensurer", bg=PANEL, fg=ORANGE,
-                                      activebackground=EDGE, activeforeground=ORANGE, bd=0,
-                                      font=self.f_bold, cursor="hand2", command=self._decensor_dialog)
+        # Gestionnaire de modèles — visible seulement en mode Heretic.
+        self.models_btn = tk.Button(top, text="⚙ Modèles", bg=PANEL, fg=ORANGE,
+                                     activebackground=EDGE, activeforeground=ORANGE, bd=0,
+                                     font=self.f_bold, cursor="hand2", command=self._models_manager)
 
         self.view = tk.Text(self.chat, bg=BG, fg=FG, wrap="word", bd=0, padx=16, pady=10,
                             font=self.f_body, insertbackground=FG, state="disabled",
@@ -287,13 +293,11 @@ class LexOSApp:
         self.model, note = choose_model(available, primary, fallback)
         self._reset_conversation(announce=True)
         self.header.configure(text=f"{title}   ·   {self.model or 'aucun modèle'}")
-        # Les outils de modification de modèle n'apparaissent que dans Heretic.
+        # Le gestionnaire de modèles n'apparaît que dans Heretic.
         if key == "heretic":
-            self.decensor_btn.pack(side="right", padx=8)
-            self.import_btn.pack(side="right", padx=8)
+            self.models_btn.pack(side="right", padx=8)
         else:
-            self.decensor_btn.pack_forget()
-            self.import_btn.pack_forget()
+            self.models_btn.pack_forget()
         extra = ""
         if key == "heretic" and self.model and self.model != "heretic:latest":
             extra = "  ⚠ modèle de repli NON décensuré."
@@ -432,68 +436,169 @@ class LexOSApp:
         finally:
             self.queue.put(("done", ""))
 
-    # ---- décensurer un modèle avec Heretic ------------------------------
-    def _decensor_dialog(self) -> None:
-        if self.busy:
-            return
-        model = self.simpledialog.askstring(
-            "Heretic — décensurer un modèle",
-            "Nom du modèle Hugging Face à décensurer\n"
-            "(ex : Qwen/Qwen3-4B-Instruct-2507) :", parent=self.root)
-        if not model:
-            return
-        self._set_busy(True)
+    # ---- gestionnaire de modèles ----------------------------------------
+    def _goto_chat(self, header: str) -> None:
         self.home.pack_forget()
         self.chat.pack(fill="both", expand=True)
-        self.header.configure(text="Heretic — décensuration")
+        self.header.configure(text=header)
+        self.models_btn.pack_forget()
         self.view.configure(state="normal")
         self.view.delete("1.0", "end")
         self.view.configure(state="disabled")
-        self._write(f"Lancement de Heretic sur « {model} »…\n", "ai")
-        self._write("Ça utilise ta carte graphique plusieurs minutes et crée un NOUVEAU "
-                    "modèle (l'original n'est pas touché). Suis les questions de Heretic "
-                    "dans le terminal.\n", "tool")
-        threading.Thread(target=self._heretic_worker, args=(model,), daemon=True).start()
 
-    def _heretic_worker(self, model: str) -> None:
-        try:
-            msg = run_heretic(model, confirm=self._gui_confirm)
-            self.queue.put(("answer", msg + "\n"))
-        except ModelOpsError as e:
-            self.queue.put(("error", f"{e}\n"))
-        except Exception as e:  # pragma: no cover
-            self.queue.put(("error", f"Erreur : {e}\n"))
-        finally:
-            self.queue.put(("done", ""))
+    def _run_modelop(self, header: str, startline: str, fn) -> None:
+        """Lance une opération de modèle (fn renvoie un texte) dans un fil, et
+        montre le résultat dans la zone de conversation."""
+        self._goto_chat(header)
+        self._write(startline + "\n", "ai")
+        self._set_busy(True)
 
-    def _import_dialog(self) -> None:
-        """Importer dans Ollama un modèle modifié (dossier safetensors ou .gguf)."""
+        def work():
+            try:
+                self.queue.put(("answer", fn() + "\n"))
+            except ModelOpsError as e:
+                self.queue.put(("error", f"{e}\n"))
+            except Exception as e:  # pragma: no cover
+                self.queue.put(("error", f"Erreur : {e}\n"))
+            finally:
+                self.queue.put(("done", ""))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _models_manager(self) -> None:
+        """Fenêtre listant les modèles installés + toutes les opérations."""
         if self.busy:
             return
-        folder = self.filedialog.askdirectory(
-            title="Dossier du modèle modifié (safetensors ou .gguf)")
-        if not folder:
-            return
-        name = self.simpledialog.askstring(
-            "Importer dans Ollama",
-            "Nom du nouveau modèle Ollama\n(minuscules, chiffres, . _ - — ex : qwen3-libre) :",
-            parent=self.root)
-        if not name:
-            return
-        self._write(f"Import de « {name} » depuis {folder}…\n", "ai")
-        self._set_busy(True)
-        threading.Thread(target=self._import_worker, args=(folder, name), daemon=True).start()
+        tk = self.tk
+        win = tk.Toplevel(self.root)
+        win.title("Gérer les modèles")
+        win.configure(bg=BG)
+        win.geometry("480x460")
+        win.transient(self.root)
 
-    def _import_worker(self, folder: str, name: str) -> None:
-        try:
-            msg = import_to_ollama(folder, name, self.config, confirm=self._gui_confirm)
-            self.queue.put(("answer", msg + "\n"))
-        except ModelOpsError as e:
-            self.queue.put(("error", f"{e}\n"))
-        except Exception as e:  # pragma: no cover
-            self.queue.put(("error", f"Erreur : {e}\n"))
-        finally:
-            self.queue.put(("done", ""))
+        tk.Label(win, text="Modèles installés", bg=BG, fg=ORANGE,
+                 font=self.f_bold).pack(anchor="w", padx=14, pady=(14, 4))
+        lb = tk.Listbox(win, bg=PANEL, fg=FG, selectbackground=ORANGE,
+                        selectforeground=ORANGE_DK, bd=0, highlightthickness=0,
+                        font=self.f_body, height=8, activestyle="none")
+        lb.pack(fill="both", expand=True, padx=14)
+
+        def refresh():
+            lb.delete(0, "end")
+            try:
+                for m in self.client.list_models():
+                    lb.insert("end", m)
+            except OllamaError as e:
+                lb.insert("end", f"(Ollama injoignable : {e})")
+
+        def selected() -> str | None:
+            sel = lb.curselection()
+            if not sel:
+                return None
+            val = lb.get(sel[0])
+            return None if val.startswith("(") else val
+
+        refresh()
+        info = tk.Label(win, text="Sélectionne un modèle pour Variante / Renommer / Supprimer / Détails.",
+                        bg=BG, fg=MUTED, font=self.f_small, wraplength=450, justify="left")
+        info.pack(anchor="w", padx=14, pady=(6, 2))
+
+        grid = tk.Frame(win, bg=BG)
+        grid.pack(fill="x", padx=12, pady=(4, 12))
+
+        def need_selection():
+            self.messagebox.showinfo("Sélection", "Choisis d'abord un modèle dans la liste.", parent=win)
+
+        # --- opérations ---
+        def op_variant():
+            base = selected()
+            if not base:
+                return need_selection()
+            name = self.simpledialog.askstring("Variante", "Nom de la variante (ex : qwen3-quebec) :", parent=win)
+            if not name:
+                return
+            system = self.simpledialog.askstring("Variante", "Prompt système à fixer (laisse vide pour aucun) :", parent=win) or ""
+            temp = self.simpledialog.askstring("Variante", "Température 0.0–2.0 (laisse vide pour défaut) :", parent=win)
+            win.destroy()
+            self._run_modelop("Modèles — variante", f"Création de « {name} » depuis « {base} »…",
+                              lambda: create_variant(base, name, system, temp, self.config, self._gui_confirm))
+
+        def op_rename():
+            src = selected()
+            if not src:
+                return need_selection()
+            dst = self.simpledialog.askstring("Renommer / copier", f"Nouveau nom pour « {src} » :", parent=win)
+            if not dst:
+                return
+            win.destroy()
+            self._run_modelop("Modèles — copie", f"Copie de « {src} » vers « {dst} »…",
+                              lambda: copy_model(src, dst, self._gui_confirm))
+
+        def op_delete():
+            name = selected()
+            if not name:
+                return need_selection()
+            win.destroy()
+            self._run_modelop("Modèles — suppression", f"Suppression de « {name} »…",
+                              lambda: delete_model(name, self._gui_confirm))
+
+        def op_details():
+            name = selected()
+            if not name:
+                return need_selection()
+            win.destroy()
+            self._run_modelop("Modèles — détails", f"Détails de « {name} » :",
+                              lambda: show_model(name))
+
+        def op_decensor():
+            model = self.simpledialog.askstring(
+                "Décensurer (Heretic)",
+                "Modèle Hugging Face à décensurer\n(ex : Qwen/Qwen3-4B-Instruct-2507) :", parent=win)
+            if not model:
+                return
+            win.destroy()
+            self._run_modelop("Heretic — décensuration",
+                              f"Lancement de Heretic sur « {model} » — suis ses questions dans le terminal…",
+                              lambda: run_heretic(model, self._gui_confirm))
+
+        def op_import():
+            folder = self.filedialog.askdirectory(title="Dossier du modèle (safetensors ou .gguf)", parent=win)
+            if not folder:
+                return
+            name = self.simpledialog.askstring("Importer", "Nom du nouveau modèle Ollama (ex : qwen3-libre) :", parent=win)
+            if not name:
+                return
+            win.destroy()
+            self._run_modelop("Modèles — import", f"Import de « {name} » depuis {folder}…",
+                              lambda: import_to_ollama(folder, name, self.config, self._gui_confirm))
+
+        def op_pull():
+            name = self.simpledialog.askstring("Télécharger", "Modèle à télécharger (ex : llama3.2:1b) :", parent=win)
+            if not name:
+                return
+            win.destroy()
+            self._run_modelop("Modèles — téléchargement", f"Téléchargement de « {name} »…",
+                              lambda: pull_model(name, self._gui_confirm))
+
+        buttons = [
+            ("Variante (prompt/temp)", op_variant),
+            ("Renommer / copier", op_rename),
+            ("Supprimer", op_delete),
+            ("Détails", op_details),
+            ("Décensurer (Heretic)", op_decensor),
+            ("Importer un dossier", op_import),
+            ("Télécharger", op_pull),
+            ("Rafraîchir", refresh),
+        ]
+        for i, (label, cmd) in enumerate(buttons):
+            tk.Button(grid, text=label, bg=PANEL, fg=FG, activebackground=ORANGE,
+                      activeforeground=ORANGE_DK, bd=0, font=self.f_body, cursor="hand2",
+                      command=cmd).grid(row=i // 2, column=i % 2, sticky="ew", padx=4, pady=4)
+        grid.columnconfigure(0, weight=1)
+        grid.columnconfigure(1, weight=1)
+        tk.Button(win, text="Fermer", bg=BG, fg=MUTED, activebackground=BG,
+                  activeforeground=FG, bd=0, font=self.f_small, cursor="hand2",
+                  command=win.destroy).pack(pady=(0, 10))
 
     def run(self) -> None:
         self.root.mainloop()
