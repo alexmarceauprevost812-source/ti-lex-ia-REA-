@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+# Dossier de travail de l'agent et modèles
+workspace/
+models/
+output/
