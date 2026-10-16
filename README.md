@@ -198,6 +198,36 @@ sudo rm -rf /usr/share/ollama/.ollama/models
 `bash /media/marceau/LEXOS/ti-lex-ia-REA-/scripts/demarrer-lexos-usb.sh`. Sans la clé
 branchée, le PC n'a plus aucun modèle — exactement ce que tu voulais.
 
+## Tout lancer en un clic depuis la clé
+
+Copie les deux fichiers du dossier `cle-usb/` du dépôt **à la racine de la clé**, à côté
+(pas dedans) du dossier `ti-lex-ia-REA-` :
+```bash
+cp cle-usb/LANCER-LEXOS-PRO.sh cle-usb/LexOS-Pro.desktop /media/marceau/LEXOS/
+chmod +x /media/marceau/LEXOS/LANCER-LEXOS-PRO.sh /media/marceau/LEXOS/LexOS-Pro.desktop
+```
+
+- **`LANCER-LEXOS-PRO.sh`** : le plus fiable. Double-clique dessus dans le gestionnaire de
+  fichiers — la plupart proposent « Exécuter » ou « Lancer dans un terminal ». Il se trouve
+  tout seul, peu importe où la clé est montée.
+- **`LexOS-Pro.desktop`** : une icône d'application pour un bureau comme celui de LexOS Pro.
+  La première fois, un clic droit → « Autoriser le lancement » (ou « Allow Launching ») est
+  parfois nécessaire — c'est une protection normale de GNOME/XFCE contre les fichiers `.desktop`
+  inconnus, pas un bug.
+
+Les deux ouvrent un terminal, démarrent Ollama pointé sur les modèles de la clé, et affichent
+le menu à 4 choix.
+
+## Images dans Chat et Codex
+
+Pas seulement REA : dans **Chat** et **Codex** aussi, `/image <fichier> [question]` fait
+décrire une image par le modèle de vision et l'ajoute à la conversation — utile pour faire
+coder Codex à partir d'une maquette, ou faire discuter Chat d'une capture d'écran. L'image
+doit être dans le dossier de travail (`workspace/` par défaut). Exemple :
+```
+> /image maquette.png fais-moi le HTML de cet écran
+```
+
 ## Idées pour la suite
 
 - Interface web ou fenêtre graphique en plus du terminal

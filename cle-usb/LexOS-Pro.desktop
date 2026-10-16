@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=LexOS Pro — IA locale
+Comment=Chat, Codex, REA, Heretic — un clic pour tout lancer depuis la clé USB-C
+Exec=bash -c 'C=$(find /media/*/*LEXOS* /run/media/*/*/*LEXOS* -maxdepth 0 2>/dev/null | head -n1); if [ -z "$C" ]; then echo "Clé LEXOS introuvable — est-elle bien branchée et montée ?"; read -r -p "Entrée pour fermer..."; exit 1; fi; bash "$C/LANCER-LEXOS-PRO.sh"'
+Terminal=true
+Icon=utilities-terminal
+Categories=Utility;

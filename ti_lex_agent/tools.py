@@ -127,6 +127,19 @@ TOOL_SCHEMAS: list[dict] = [
 ]
 
 
+def resolve_workspace_path(config: Config, path: str) -> Path:
+    """Résout un chemin et refuse tout ce qui sort du dossier de travail.
+
+    Fonction indépendante de Toolbox pour que d'autres interfaces (le menu
+    LexOS Pro, par exemple) puissent réutiliser la même règle de sécurité
+    sans dupliquer la logique."""
+    root = config.workspace.resolve()
+    target = (root / path).resolve()
+    if target != root and root not in target.parents:
+        raise ToolError("Chemin refusé : en dehors du dossier de travail.")
+    return target
+
+
 class Toolbox:
     def __init__(self, config: Config, client: OllamaClient,
                  confirm: Callable[[str], bool] | None = None):
@@ -140,12 +153,7 @@ class Toolbox:
         return input(f"\n⚠️  {question} [o/N] ").strip().lower() in {"o", "oui", "y", "yes"}
 
     def _resolve(self, path: str) -> Path:
-        """Résout un chemin et refuse tout ce qui sort du dossier de travail."""
-        root = self.config.workspace.resolve()
-        target = (root / path).resolve()
-        if target != root and root not in target.parents:
-            raise ToolError("Chemin refusé : en dehors du dossier de travail.")
-        return target
+        return resolve_workspace_path(self.config, path)
 
     def call(self, name: str, arguments: dict) -> str:
         """Exécute un outil. Toute erreur devient un texte que le modèle peut lire."""

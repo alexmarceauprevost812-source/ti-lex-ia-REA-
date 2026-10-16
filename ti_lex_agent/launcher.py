@@ -16,6 +16,7 @@ from .config import Config
 from .memory import remember, with_memory
 from .ollama_client import OllamaClient, OllamaError
 from .params import DEFAULTS
+from .tools import IMAGE_EXTENSIONS, ToolError, resolve_workspace_path
 
 # Modèles de repli, utilisés quand le modèle principal n'est pas installé sur
 # ce PC (ex : un ordinateur moins puissant que celui où Heretic a tourné).
@@ -100,13 +101,43 @@ def resolve_model(client: OllamaClient, primary: str, fallback: str, label: str)
     return None
 
 
+def _handle_image(config: Config, client: OllamaClient, messages: list[dict], text: str) -> None:
+    """/image <chemin> [question] — décrit une image avec le modèle de vision
+    et l'ajoute à la conversation, pour que Chat/Codex puissent réagir dessus
+    même si leur propre modèle ne gère pas les images."""
+    parts = text.removeprefix("/image ").strip().split(maxsplit=1)
+    if not parts or not parts[0]:
+        print("Usage : /image <chemin-dans-le-dossier-de-travail> [question]\n")
+        return
+    rel_path, question = parts[0], (parts[1] if len(parts) > 1 else "Décris cette image en détail.")
+    try:
+        target = resolve_workspace_path(config, rel_path)
+    except ToolError as e:
+        print(f"Erreur : {e}\n")
+        return
+    if target.suffix.lower() not in IMAGE_EXTENSIONS:
+        print("Erreur : format non supporté (png, jpg, jpeg, webp, gif, bmp).\n")
+        return
+    if not target.is_file():
+        print(f"Erreur : image introuvable : {rel_path}\n")
+        return
+    print(f"{GREY}Analyse de l'image avec le modèle de vision ({config.vision_model})...{RESET}")
+    try:
+        description = client.describe_image(target, question)
+    except OllamaError as e:
+        print(f"Erreur : {e}\n")
+        return
+    messages.append({"role": "user", "content": f"[Image jointe : {rel_path}]\n{description}"})
+    print(f"{GREY}Image décrite et ajoutée à la conversation — pose ta question dessus.{RESET}\n")
+
+
 def _simple_chat(config: Config, model: str, system: str, label: str) -> None:
     """Conversation sans outils : plus rapide, pour Chat / Codex / Heretic.
     Partage la mémoire des autres interfaces et peut y ajouter avec /retenir."""
     client = OllamaClient(config)
     messages = [{"role": "system", "content": with_memory(system, config)}]
     print(f"\n{ORANGE}{BOLD}— {label} —{RESET}  (modèle : {model})  "
-          f"/retenir <texte>  /menu pour revenir\n")
+          f"/image <fichier>  /retenir <texte>  /menu pour revenir\n")
     while True:
         try:
             text = input(f"{ORANGE}>{RESET} ").strip()
@@ -119,6 +150,9 @@ def _simple_chat(config: Config, model: str, system: str, label: str) -> None:
             return
         if text.startswith("/retenir "):
             print(remember(config, text.removeprefix("/retenir ")), "\n")
+            continue
+        if text.startswith("/image "):
+            _handle_image(config, client, messages, text)
             continue
         messages.append({"role": "user", "content": text})
         try:
