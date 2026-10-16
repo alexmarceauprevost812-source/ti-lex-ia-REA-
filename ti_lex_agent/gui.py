@@ -33,7 +33,7 @@ from .launcher import (
     _has_model,
 )
 from .memory import remember, with_memory
-from .modelops import ModelOpsError, run_heretic
+from .modelops import ModelOpsError, import_to_ollama, run_heretic
 from .ollama_client import OllamaClient, OllamaError
 from .tools import IMAGE_EXTENSIONS
 
@@ -181,6 +181,13 @@ class LexOSApp:
         tk.Button(top, text="Effacer", bg=PANEL, fg=MUTED, activebackground=EDGE,
                   activeforeground=FG, bd=0, font=self.f_body, cursor="hand2",
                   command=lambda: self._reset_conversation(True)).pack(side="right", padx=8)
+        # Outils de modification de modèle — visibles seulement en mode Heretic.
+        self.import_btn = tk.Button(top, text="Importer", bg=PANEL, fg=GREEN,
+                                    activebackground=EDGE, activeforeground=GREEN, bd=0,
+                                    font=self.f_body, cursor="hand2", command=self._import_dialog)
+        self.decensor_btn = tk.Button(top, text="Décensurer", bg=PANEL, fg=ORANGE,
+                                      activebackground=EDGE, activeforeground=ORANGE, bd=0,
+                                      font=self.f_bold, cursor="hand2", command=self._decensor_dialog)
 
         self.view = tk.Text(self.chat, bg=BG, fg=FG, wrap="word", bd=0, padx=16, pady=10,
                             font=self.f_body, insertbackground=FG, state="disabled",
@@ -280,6 +287,13 @@ class LexOSApp:
         self.model, note = choose_model(available, primary, fallback)
         self._reset_conversation(announce=True)
         self.header.configure(text=f"{title}   ·   {self.model or 'aucun modèle'}")
+        # Les outils de modification de modèle n'apparaissent que dans Heretic.
+        if key == "heretic":
+            self.decensor_btn.pack(side="right", padx=8)
+            self.import_btn.pack(side="right", padx=8)
+        else:
+            self.decensor_btn.pack_forget()
+            self.import_btn.pack_forget()
         extra = ""
         if key == "heretic" and self.model and self.model != "heretic:latest":
             extra = "  ⚠ modèle de repli NON décensuré."
@@ -444,6 +458,35 @@ class LexOSApp:
     def _heretic_worker(self, model: str) -> None:
         try:
             msg = run_heretic(model, confirm=self._gui_confirm)
+            self.queue.put(("answer", msg + "\n"))
+        except ModelOpsError as e:
+            self.queue.put(("error", f"{e}\n"))
+        except Exception as e:  # pragma: no cover
+            self.queue.put(("error", f"Erreur : {e}\n"))
+        finally:
+            self.queue.put(("done", ""))
+
+    def _import_dialog(self) -> None:
+        """Importer dans Ollama un modèle modifié (dossier safetensors ou .gguf)."""
+        if self.busy:
+            return
+        folder = self.filedialog.askdirectory(
+            title="Dossier du modèle modifié (safetensors ou .gguf)")
+        if not folder:
+            return
+        name = self.simpledialog.askstring(
+            "Importer dans Ollama",
+            "Nom du nouveau modèle Ollama\n(minuscules, chiffres, . _ - — ex : qwen3-libre) :",
+            parent=self.root)
+        if not name:
+            return
+        self._write(f"Import de « {name} » depuis {folder}…\n", "ai")
+        self._set_busy(True)
+        threading.Thread(target=self._import_worker, args=(folder, name), daemon=True).start()
+
+    def _import_worker(self, folder: str, name: str) -> None:
+        try:
+            msg = import_to_ollama(folder, name, self.config, confirm=self._gui_confirm)
             self.queue.put(("answer", msg + "\n"))
         except ModelOpsError as e:
             self.queue.put(("error", f"{e}\n"))
