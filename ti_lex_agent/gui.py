@@ -120,6 +120,16 @@ class LexOSApp:
         center = tk.Frame(self.home, bg=BG)
         center.place(relx=0.5, rely=0.5, anchor="center")
 
+        # Mascotte TI-LEX (personnage à capuche). Encodée dans _assets.py pour
+        # voyager avec la clé ; si le Tk est trop vieux pour le PNG, on l'ignore.
+        self.capuche_img = None
+        try:
+            from . import _assets
+            self.capuche_img = tk.PhotoImage(data=_assets.CAPUCHE_PNG_B64)
+            tk.Label(center, image=self.capuche_img, bg=BG).pack(pady=(0, 10))
+        except Exception:
+            self.capuche_img = None
+
         tk.Label(center, text="LexOS Pro", bg=BG, fg=ORANGE, font=self.f_logo).pack()
         tk.Label(center, text="I A   L O C A L E   ·   O P E N   S O U R C E",
                  bg=BG, fg=MUTED, font=self.f_small).pack(pady=(2, 26))
