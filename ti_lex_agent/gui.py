@@ -86,6 +86,49 @@ MODES = {
 }
 
 
+def round_rect(cv, x1, y1, x2, y2, r, **kw):
+    """Dessine un rectangle à coins arrondis sur un Canvas (polygone lissé)."""
+    pts = [x1 + r, y1, x2 - r, y1, x2, y1, x2, y1 + r,
+           x2, y2 - r, x2, y2, x2 - r, y2, x1 + r, y2,
+           x1, y2, x1, y2 - r, x1, y1 + r, x1, y1]
+    return cv.create_polygon(pts, smooth=True, **kw)
+
+
+class RoundButton:
+    """Un bouton à coins arrondis dessiné sur un Canvas (Tkinter n'arrondit pas
+    les vrais boutons). Gère le survol, l'activation/désactivation et le texte."""
+
+    def __init__(self, tk, parent, text, command, w, h, fill, fg, font, active, radius=14):
+        self.cv = tk.Canvas(parent, width=w, height=h, bg=parent["bg"],
+                            highlightthickness=0, cursor="hand2")
+        self.fill, self.active, self.fg = fill, active, fg
+        self.command = command
+        self.enabled = True
+        self.rect = round_rect(self.cv, 1, 1, w - 1, h - 1, radius, fill=fill, outline=fill)
+        self.label = self.cv.create_text(w // 2, h // 2, text=text, fill=fg, font=font)
+        self.cv.bind("<Button-1>", self._click)
+        self.cv.bind("<Enter>", lambda _e: self.enabled and self.cv.itemconfig(
+            self.rect, fill=self.active, outline=self.active))
+        self.cv.bind("<Leave>", lambda _e: self.cv.itemconfig(
+            self.rect, fill=self.fill if self.enabled else "#333", outline=self.fill if self.enabled else "#333"))
+
+    def _click(self, _e):
+        if self.enabled and self.command:
+            self.command()
+
+    def set_text(self, text):
+        self.cv.itemconfig(self.label, text=text)
+
+    def set_enabled(self, on):
+        self.enabled = on
+        c = self.fill if on else "#333"
+        self.cv.itemconfig(self.rect, fill=c, outline=c)
+
+    def pack(self, **kw):
+        self.cv.pack(**kw)
+        return self
+
+
 def choose_model(available: list[str], primary: str, fallback: str) -> tuple[str | None, str]:
     """Comme resolve_model du menu texte, mais retourne (modèle, note) au lieu
     d'imprimer — pratique pour afficher la note dans la fenêtre."""
@@ -167,20 +210,17 @@ class LexOSApp:
         tk.Label(center, text="I A   L O C A L E   ·   O P E N   S O U R C E",
                  bg=BG, fg=MUTED, font=self.f_small).pack(pady=(2, 26))
 
+        cardw, cardh, rad = 384, 56, 16
         for key, (title, sub, *_r) in MODES.items():
-            card = tk.Frame(center, bg=PANEL, highlightbackground=EDGE, highlightthickness=1,
-                            cursor="hand2", width=360)
-            card.pack(fill="x", pady=5, ipady=4)
-            card.pack_propagate(False)
-            card.configure(height=58)
-            t = tk.Label(card, text=title, bg=PANEL, fg=ORANGE, font=self.f_mode, anchor="w")
-            t.pack(fill="x", padx=16, pady=(6, 0))
-            s = tk.Label(card, text=sub, bg=PANEL, fg=MUTED, font=self.f_small, anchor="w")
-            s.pack(fill="x", padx=16)
-            for w in (card, t, s):
-                w.bind("<Button-1>", lambda _e, k=key: self._open_mode(k))
-                w.bind("<Enter>", lambda _e, c=card: c.configure(highlightbackground=ORANGE))
-                w.bind("<Leave>", lambda _e, c=card: c.configure(highlightbackground=EDGE))
+            cv = tk.Canvas(center, width=cardw, height=cardh, bg=BG,
+                           highlightthickness=0, cursor="hand2")
+            cv.pack(pady=4)
+            rect = round_rect(cv, 2, 2, cardw - 2, cardh - 2, rad, fill=PANEL, outline=EDGE, width=1)
+            cv.create_text(20, 21, text=title, anchor="w", fill=ORANGE, font=self.f_mode)
+            cv.create_text(20, 40, text=sub, anchor="w", fill=MUTED, font=self.f_small)
+            cv.bind("<Button-1>", lambda _e, k=key: self._open_mode(k))
+            cv.bind("<Enter>", lambda _e, c=cv, r=rect: c.itemconfig(r, outline=ORANGE, width=2))
+            cv.bind("<Leave>", lambda _e, c=cv, r=rect: c.itemconfig(r, outline=EDGE, width=1))
 
         tk.Button(center, text="⚙ Gérer les modèles (décensurer, créer, importer…)", bg=BG, fg=BLUE,
                   activebackground=BG, activeforeground=BLUE, bd=0, font=self.f_small,
@@ -226,10 +266,9 @@ class LexOSApp:
                              insertbackground=ORANGE, font=self.f_body, padx=10, pady=8)
         self.entry.pack(side="left", fill="both", expand=True)
         self.entry.bind("<Return>", self._on_return)
-        self.send_btn = tk.Button(bottom, text="Envoyer", bg=ORANGE, fg=ORANGE_DK,
-                                  activebackground=GREEN, bd=0, font=self.f_bold,
-                                  cursor="hand2", padx=16, command=self._send)
-        self.send_btn.pack(side="right", fill="y", padx=(8, 0))
+        self.send_btn = RoundButton(tk, bottom, "Envoyer", self._send, 104, 46,
+                                    ORANGE, ORANGE_DK, self.f_bold, GREEN, radius=14)
+        self.send_btn.pack(side="right", padx=(8, 0))
 
         self.status = tk.Label(self.chat, text="", bg=PANEL, fg=MUTED, anchor="w",
                                font=self.f_small, padx=12, pady=4)
@@ -421,8 +460,8 @@ class LexOSApp:
 
     def _set_busy(self, busy: bool) -> None:
         self.busy = busy
-        self.send_btn.configure(state="disabled" if busy else "normal",
-                                text="…" if busy else "Envoyer")
+        self.send_btn.set_enabled(not busy)
+        self.send_btn.set_text("…" if busy else "Envoyer")
 
     # ---- image ----------------------------------------------------------
     def _attach_image(self) -> None:
