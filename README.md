@@ -161,6 +161,43 @@ travail ; change l'emplacement avec `TILEX_MEMORY` pour le garder sur la clé US
   3. Clone le dépôt et lance avec `OLLAMA_HOST=http://IP-DU-PC:11434 python -m ti_lex_agent.launcher`
   Le téléphone n'exécute pas le modèle : il envoie tes messages au PC et reçoit la réponse.
 
+## Vider le PC — tout sur la clé USB-C seulement
+
+**Toujours dans cet ordre : copier, tester, confirmer, SEULEMENT ENSUITE supprimer.**
+Supprimer avant de confirmer que ça marche te laisse sans aucun modèle nulle part.
+
+**1. Copie les modèles Ollama du disque interne vers la clé** (remplace le chemin par
+l'endroit où ta clé est montée) :
+```bash
+mkdir -p /media/marceau/LEXOS/ollama-models
+sudo rsync -av --progress /usr/share/ollama/.ollama/models/ /media/marceau/LEXOS/ollama-models/
+```
+
+**2. Copie aussi le projet sur la clé** (pour qu'il n'ait plus besoin du disque interne) :
+```bash
+cp -r ~/ti-lex-ia-REA- /media/marceau/LEXOS/
+cd /media/marceau/LEXOS/ti-lex-ia-REA-
+python3 -m venv .venv && source .venv/bin/activate && pip install -e .
+```
+
+**3. Teste que tout marche DEPUIS LA CLÉ, sans toucher au disque interne** :
+```bash
+bash scripts/demarrer-lexos-usb.sh /media/marceau/LEXOS
+```
+Essaie les 4 modes (surtout Heretic). Si un modèle manque ou qu'une erreur apparaît, le
+disque interne a encore tout — rien n'est perdu, tu peux corriger et réessayer.
+
+**4. Seulement si l'étape 3 fonctionne bien**, libère le disque interne :
+```bash
+sudo systemctl stop ollama
+sudo systemctl disable ollama   # pour qu'il ne redémarre plus tout seul au boot
+sudo rm -rf /usr/share/ollama/.ollama/models
+```
+
+**À partir de maintenant**, pour utiliser l'IA : branche la clé, puis
+`bash /media/marceau/LEXOS/ti-lex-ia-REA-/scripts/demarrer-lexos-usb.sh`. Sans la clé
+branchée, le PC n'a plus aucun modèle — exactement ce que tu voulais.
+
 ## Idées pour la suite
 
 - Interface web ou fenêtre graphique en plus du terminal
