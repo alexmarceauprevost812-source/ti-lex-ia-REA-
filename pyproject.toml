@@ -10,7 +10,9 @@ dev = ["pytest>=8"]
 
 [project.scripts]
 ti-lex-agent = "ti_lex_agent.cli:main"
-lexos-pro = "ti_lex_agent.launcher:main"
+# Pas "lexos-pro" : ce nom est déjà pris par l'appli de Paramètres LexOS
+# existante (PySide6) et entrait en conflit avec elle.
+lexos-ia = "ti_lex_agent.launcher:main"
 
 [build-system]
 requires = ["setuptools>=68"]

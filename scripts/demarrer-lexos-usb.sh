@@ -47,4 +47,4 @@ echo
 echo "== Lancement du menu LexOS Pro =="
 cd "$CLE/ti-lex-ia-REA-"
 source .venv/bin/activate
-exec lexos-pro
+exec lexos-ia

@@ -113,8 +113,11 @@ Les tests utilisent un faux modèle : ils n'ont besoin ni d'Ollama ni d'internet
 ```bash
 python -m ti_lex_agent.launcher
 # ou, après `pip install -e .` :
-lexos-pro
+lexos-ia
 ```
+
+(La commande s'appelle `lexos-ia`, pas `lexos-pro` — ce dernier nom est déjà pris par
+l'application de Paramètres LexOS existante.)
 
 Un seul menu, 4 modes, tous sur Ollama :
 
@@ -173,11 +176,13 @@ mkdir -p /media/marceau/LEXOS/ollama-models
 sudo rsync -av --progress /usr/share/ollama/.ollama/models/ /media/marceau/LEXOS/ollama-models/
 ```
 
-**2. Copie aussi le projet sur la clé** (pour qu'il n'ait plus besoin du disque interne) :
+**2. Copie aussi le projet sur la clé** (pour qu'il n'ait plus besoin du disque interne).
+Une clé formatée exFAT/FAT ne supporte pas les liens symboliques qu'un `.venv` utilise :
+exclus-le de la copie, et recrée-le directement sur la clé avec `--copies` :
 ```bash
-cp -r ~/ti-lex-ia-REA- /media/marceau/LEXOS/
+rsync -a --exclude='.venv' ~/ti-lex-ia-REA-/ /media/marceau/LEXOS/ti-lex-ia-REA-/
 cd /media/marceau/LEXOS/ti-lex-ia-REA-
-python3 -m venv .venv && source .venv/bin/activate && pip install -e .
+python3 -m venv .venv --copies && source .venv/bin/activate && pip install -e .
 ```
 
 **3. Teste que tout marche DEPUIS LA CLÉ, sans toucher au disque interne** :
