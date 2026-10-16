@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Callable
 
 from .config import Config
+from .memory import with_memory
 from .ollama_client import OllamaClient
 from .tools import TOOL_SCHEMAS, Toolbox
 
@@ -29,13 +30,16 @@ class Agent:
         self.client = client or OllamaClient(self.config)
         self.tools = Toolbox(self.config, self.client, confirm)
         self.on_event = on_event or (lambda _msg: None)
-        self.messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
+        self._system_prompt = with_memory(SYSTEM_PROMPT, self.config)
+        self.messages: list[dict] = [{"role": "system", "content": self._system_prompt}]
         # Réglages de génération (température, etc.) — voir params.py. Partagé par
         # référence avec l'appelant, pour que /temp change aussi les prochains tours.
         self.options: dict = options if options is not None else {}
 
     def reset(self) -> None:
-        self.messages = self.messages[:1]
+        # Relit la mémoire partagée, au cas où /retenir l'aurait changée.
+        self._system_prompt = with_memory(SYSTEM_PROMPT, self.config)
+        self.messages = [{"role": "system", "content": self._system_prompt}]
 
     def run(self, user_message: str) -> str:
         """Traite une demande de l'utilisateur et retourne la réponse finale."""

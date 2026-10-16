@@ -108,8 +108,62 @@ pytest
 
 Les tests utilisent un faux modèle : ils n'ont besoin ni d'Ollama ni d'internet.
 
+## Menu LexOS Pro (Chat, Codex, REA, Heretic)
+
+```bash
+python -m ti_lex_agent.launcher
+# ou, après `pip install -e .` :
+lexos-pro
+```
+
+Un seul menu, 4 modes, tous sur Ollama :
+
+| # | Mode | Pour quoi | Modèle par défaut |
+| --- | --- | --- | --- |
+| 1 | Chat | conversation générale, rapide, sans outils | `qwen3-vl:4b` |
+| 2 | Codex | assistant de code, sans outils | `qwen2.5-coder:7b` |
+| 3 | REA | l'agent complet (web, vision, fichiers) | `heretic:latest` |
+| 4 | Heretic | chat direct avec le modèle décensuré, sans outils | `heretic:latest` |
+
+Change les noms avec `TILEX_CHAT_MODEL`, `TILEX_CODEX_MODEL`, `TILEX_REA_MODEL`,
+`TILEX_HERETIC_MODEL`. Fonctionne pareil installé sur le disque ou lancé depuis une clé USB-C —
+rien dans le code ne dépend d'un chemin fixe.
+
+**PC moins puissant :** si le modèle par défaut n'est pas installé, le menu bascule tout seul
+sur un plus petit (`TILEX_CHAT_FALLBACK`, `TILEX_CODEX_FALLBACK`, `TILEX_REA_FALLBACK`,
+défauts : `llama3.2:1b`, `qwen2.5-coder:1.5b`, `qwen2.5:3b`) et te dit quoi faire si même celui-là
+manque. Le repli du mode Heretic n'est **pas décensuré** — un petit modèle ne peut pas hériter
+d'Heretic sans qu'Heretic tourne dessus, ce qui prend une vraie carte graphique.
+
+## Mémoire partagée
+
+Les 4 modes lisent et complètent le **même** fichier (`memoire-ia.md`, à côté du dossier de
+travail ; change l'emplacement avec `TILEX_MEMORY` pour le garder sur la clé USB).
+
+- `/retenir <texte>` — ajoute un fait que les 4 modes connaîtront, dans n'importe lequel d'entre eux.
+- Rien n'est deviné automatiquement par le modèle : seul ce que tu demandes d'écrire y va.
+- Les **erreurs d'outils** (fichier introuvable, commande refusée par le système…) sont par contre
+  notées toutes seules dans REA, pour éviter de refaire la même erreur — sauf un refus volontaire
+  de ta part, qui n'est pas une erreur. L'écriture s'arrête automatiquement s'il reste moins de
+  20 Mo sur la clé, pour ne jamais la remplir.
+
+## Cross-plateforme
+
+- **Linux et Windows** : le code est en Python pur ; installe Python, Ollama, puis
+  `pip install -e .` des deux côtés. Sous Windows, lance avec PowerShell ou CMD
+  (`python -m ti_lex_agent.launcher`).
+- **Android** : un téléphone ne peut pas faire tourner `heretic:latest` (18 Go, besoin d'une
+  carte graphique). La seule façon réaliste est de se connecter **par le réseau** à Ollama lancé
+  sur ton PC :
+  1. Sur le PC : `OLLAMA_HOST=0.0.0.0 ollama serve` (ouvre Ollama au réseau local)
+  2. Sur le téléphone : installe [Termux](https://termux.dev/), puis
+     `pkg install python && pip install requests ddgs`
+  3. Clone le dépôt et lance avec `OLLAMA_HOST=http://IP-DU-PC:11434 python -m ti_lex_agent.launcher`
+  Le téléphone n'exécute pas le modèle : il envoie tes messages au PC et reçoit la réponse.
+
 ## Idées pour la suite
 
-- Interface web ou fenêtre simple en plus du terminal
-- Mémoire entre les sessions
-- Brancher l'agent sur LexOS-Pro (commande `lexos agent`)
+- Interface web ou fenêtre graphique en plus du terminal
+- Copier automatiquement les modèles Ollama sur la clé pour un vrai fonctionnement portable
+  (aujourd'hui, `ollama list` lit le disque interne, pas la clé)
+- Mémoire qui résume automatiquement une conversation, en plus de `/retenir`

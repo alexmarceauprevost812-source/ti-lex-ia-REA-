@@ -9,6 +9,7 @@ Règles de sécurité :
 from __future__ import annotations
 
 import ipaddress
+import os
 import shlex
 import socket
 import subprocess
@@ -154,11 +155,20 @@ class Toolbox:
         try:
             return _truncate(str(func(**arguments)))
         except ToolError as e:
-            return f"Erreur : {e}"
+            return self._fail(name, arguments, f"Erreur : {e}")
         except TypeError as e:
-            return f"Erreur : arguments invalides pour {name} ({e})."
+            return self._fail(name, arguments, f"Erreur : arguments invalides pour {name} ({e}).")
         except Exception as e:  # on ne plante jamais la boucle de l'agent
-            return f"Erreur inattendue ({type(e).__name__}) : {e}"
+            return self._fail(name, arguments, f"Erreur inattendue ({type(e).__name__}) : {e}")
+
+    def _fail(self, name: str, arguments: dict, message: str) -> str:
+        """Note l'erreur dans la mémoire partagée pour éviter de la refaire —
+        sauf un refus volontaire de l'utilisateur, qui n'est pas une erreur."""
+        if "a refusé" not in message:
+            from .memory import remember_error
+            context = f"{name}(" + ", ".join(f"{k}={v!r}" for k, v in arguments.items())[:120] + ")"
+            remember_error(self.config, context, message[:200])
+        return message
 
     # ------------------------------------------------------------------- web
     def tool_web_search(self, query: str, max_results: int = 5) -> str:
@@ -231,7 +241,9 @@ class Toolbox:
         if not self.confirm(f"Lancer cette commande ?\n    {command}"):
             raise ToolError("L'utilisateur a refusé cette commande.")
         try:
-            args = shlex.split(command)
+            # Sous Windows, les chemins utilisent \ : shlex.split(posix=True) les
+            # casserait en les traitant comme des caractères d'échappement.
+            args = shlex.split(command, posix=(os.name != "nt"))
         except ValueError as e:
             raise ToolError(f"Commande mal formée : {e}") from e
         if not args:

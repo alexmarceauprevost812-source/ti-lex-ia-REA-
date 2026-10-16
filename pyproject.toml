@@ -10,6 +10,7 @@ dev = ["pytest>=8"]
 
 [project.scripts]
 ti-lex-agent = "ti_lex_agent.cli:main"
+lexos-pro = "ti_lex_agent.launcher:main"
 
 [build-system]
 requires = ["setuptools>=68"]

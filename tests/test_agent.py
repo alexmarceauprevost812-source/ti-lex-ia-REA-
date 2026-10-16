@@ -63,6 +63,18 @@ def test_unknown_tool_and_bad_arguments(config):
     assert "invalides" in t.call("read_file", {"mauvais": 1})
 
 
+def test_real_errors_are_remembered_but_refusals_are_not(config):
+    from ti_lex_agent.memory import load_memory
+
+    t = make_tools(config)
+    t.call("read_file", {"path": "introuvable.txt"})
+    assert "introuvable.txt" in load_memory(config) or "introuvable" in load_memory(config)
+
+    before = load_memory(config)
+    make_tools(config, answer=False).call("run_command", {"command": "echo hi"})
+    assert load_memory(config) == before  # un refus volontaire n'est pas une erreur à retenir
+
+
 def test_describe_image_validates_input(config):
     t = make_tools(config)
     (config.workspace / "photo.png").write_bytes(b"\x89PNG")
