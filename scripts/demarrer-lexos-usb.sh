@@ -25,28 +25,38 @@ fi
 
 echo "== Modèles utilisés : $MODELS (PAS le disque interne) =="
 
-# Arrête le service système s'il tourne, pour éviter un conflit de port et pour
-# qu'il ne reparte pas tout seul avec l'ancien dossier du disque interne.
+# On repart toujours d'un Ollama propre, pointé sur la clé. Si une instance
+# tourne déjà (service système OU "ollama serve" resté en mémoire d'un essai
+# précédent), elle répond sur le port 11434 mais avec SON dossier de modèles
+# à elle, pas forcément celui de la clé — d'où une liste de modèles vide ou
+# fausse. On l'arrête donc systématiquement avant de relancer.
 if systemctl is-active --quiet ollama 2>/dev/null; then
     echo "Arrêt du service ollama système..."
     sudo systemctl stop ollama
 fi
+if pgrep -f "ollama serve" >/dev/null 2>&1; then
+    echo "Arrêt d'une instance ollama déjà en mémoire..."
+    pkill -f "ollama serve" || true
+fi
+# Attend que le port se libère avant de relancer (jusqu'à 10s).
+for _ in $(seq 1 10); do
+    curl -s -o /dev/null http://localhost:11434/api/tags || break
+    sleep 1
+done
 
 # Relance Ollama en arrière-plan, pointé uniquement sur la clé.
 export OLLAMA_MODELS="$MODELS"
-if ! curl -s -o /dev/null http://localhost:11434/api/tags; then
-    echo "Démarrage d'Ollama sur les modèles de la clé..."
-    nohup ollama serve >"$CLE/ollama.log" 2>&1 &
-    # Une clé USB est plus lente qu'un disque interne : on attend qu'Ollama
-    # réponde vraiment au lieu d'un délai fixe (sinon la liste des modèles
-    # peut apparaître vide alors qu'Ollama démarre encore).
-    for _ in $(seq 1 30); do
-        if curl -s -o /dev/null http://localhost:11434/api/tags; then
-            break
-        fi
-        sleep 1
-    done
-fi
+echo "Démarrage d'Ollama sur les modèles de la clé..."
+nohup ollama serve >"$CLE/ollama.log" 2>&1 &
+# Une clé USB est plus lente qu'un disque interne : on attend qu'Ollama
+# réponde vraiment au lieu d'un délai fixe (sinon la liste des modèles
+# peut apparaître vide alors qu'Ollama démarre encore).
+for _ in $(seq 1 30); do
+    if curl -s -o /dev/null http://localhost:11434/api/tags; then
+        break
+    fi
+    sleep 1
+done
 
 echo "== Modèles disponibles =="
 REPONSE=$(curl -s http://localhost:11434/api/tags)
