@@ -1,0 +1,138 @@
+<title>LexOS Pro — Aperçu</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Identité "terminal LexOS" : fond noir profond, accent orange, texte gris clair.
+     Mono partout (c'est un terminal). Thème sombre assumé — on fixe quand même
+     tout explicitement pour un rendu correct sur n'importe quel fond hôte. */
+  :root{
+    --bg:#0b0b0d; --panel:#131318; --edge:#26262e;
+    --fg:#e7e7ea; --muted:#8a8a93;
+    --orange:#ff8a1e; --orange-dim:#c96a12;
+    --green:#4bd07a; --blue:#5fb0ff;
+    --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--fg);font-family:var(--mono);line-height:1.55}
+  .wrap{max-width:900px;margin:0 auto;
+    padding-left:max(16px,env(safe-area-inset-left,0px));
+    padding-right:max(16px,env(safe-area-inset-right,0px));
+    padding-block:32px}
+  header.top{display:flex;flex-direction:column;gap:6px;margin-bottom:24px}
+  .brand{color:var(--orange);font-weight:700;letter-spacing:.5px;font-size:1.5rem}
+  .tag{color:var(--muted);font-size:.85rem}
+  h2.sec{color:var(--orange);font-size:.8rem;letter-spacing:2px;text-transform:uppercase;
+    margin:34px 0 12px;font-weight:700}
+
+  /* Fenêtre terminal */
+  .term{background:var(--panel);border:1px solid var(--edge);border-radius:10px;
+    overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+  .bar{display:flex;align-items:center;gap:8px;padding:10px 14px;
+    background:#17171d;border-bottom:1px solid var(--edge)}
+  .dot{width:11px;height:11px;border-radius:50%}
+  .dot.r{background:#ff5f56}.dot.y{background:#ffbd2e}.dot.g{background:#27c93f}
+  .bar .name{margin-left:8px;color:var(--muted);font-size:.78rem}
+  .screen{padding:16px 18px;font-size:.86rem;overflow-x:auto}
+  pre{margin:0;white-space:pre;min-width:0}
+  .o{color:var(--orange)} .m{color:var(--muted)} .gn{color:var(--green)} .bl{color:var(--blue)}
+  .prompt{color:var(--green)} .you{color:var(--fg)}
+
+  /* Grille des 4 modes */
+  .modes{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:4px}
+  @media (max-width:560px){.modes{grid-template-columns:1fr}}
+  .mode{background:var(--panel);border:1px solid var(--edge);border-radius:10px;padding:14px 16px;
+    border-left:3px solid var(--orange)}
+  .mode h3{margin:0 0 4px;font-size:1rem;color:var(--fg)}
+  .mode .k{color:var(--orange);font-weight:700}
+  .mode p{margin:0;color:var(--muted);font-size:.82rem}
+
+  table{border-collapse:collapse;width:100%;font-size:.84rem;margin-top:4px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--edge);vertical-align:top}
+  th{color:var(--orange);text-transform:uppercase;letter-spacing:1px;font-size:.72rem}
+  td code{color:var(--green)}
+  td:first-child{white-space:nowrap}
+  .note{color:var(--muted);font-size:.8rem;margin-top:10px}
+  footer{margin-top:34px;color:var(--muted);font-size:.78rem;border-top:1px solid var(--edge);padding-top:14px}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">⚡ LexOS Pro — IA locale</div>
+    <div class="tag">Chat · Codex · REA · Heretic — tout tourne en local, depuis la clé USB-C</div>
+  </header>
+
+  <h2 class="sec">Le menu d'accueil</h2>
+  <div class="term">
+    <div class="bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+      <span class="name">LexOS Pro Terminal — clé USB-C</span></div>
+    <div class="screen"><pre><span class="o">     _      _____  __  _____  ____
+    | |    |  ___| \ \/ / _ \/ ___|
+    | |    | |__    \  / | | \___ \
+    | |___ |  __|   /  \ |_| |___) |
+    |_____||____|  /_/\_\___/|____/</span>
+    <span class="m">P R O   —   U S B - C   /   L O C A L</span>
+
+  <span class="o">1</span>  Chat     conversation générale
+  <span class="o">2</span>  Codex    assistant de code
+  <span class="o">3</span>  REA      agent complet (web, vision, fichiers)
+  <span class="o">4</span>  Heretic  chat direct, sans filtre
+  <span class="m">0  quitter</span>
+
+choix &gt; <span class="you">1</span></pre></div>
+  </div>
+
+  <h2 class="sec">Les 4 modes</h2>
+  <div class="modes">
+    <div class="mode"><h3><span class="k">1 · </span>Chat</h3><p>Conversation générale en français québécois. Rapide, sans outils.</p></div>
+    <div class="mode"><h3><span class="k">2 · </span>Codex</h3><p>Assistant de code : il explique, corrige, propose des commandes exactes.</p></div>
+    <div class="mode"><h3><span class="k">3 · </span>REA</h3><p>L'agent complet : cherche sur le web, décrit des images, lit/écrit des fichiers, lance des commandes.</p></div>
+    <div class="mode"><h3><span class="k">4 · </span>Heretic</h3><p>Chat direct avec le modèle décensuré. Le seul vraiment sans filtre.</p></div>
+  </div>
+
+  <h2 class="sec">À quoi ressemble le Chat</h2>
+  <div class="term">
+    <div class="bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+      <span class="name">Mode Chat</span></div>
+    <div class="screen"><pre><span class="m">— Mode Chat — tape /menu pour revenir, /quit pour sortir —</span>
+
+<span class="prompt">toi ❯</span> <span class="you">salut, c'est quoi la capitale du Québec ?</span>
+<span class="o">ti-lex ❯</span> La capitale du Québec, c'est la ville de Québec elle-même.
+        (À ne pas confondre avec Montréal, qui est la plus grande ville.)
+
+<span class="prompt">toi ❯</span> <span class="you">/image ~/photos/facture.png combien ça coûte ?</span>
+<span class="m">Analyse de l'image avec le modèle de vision…</span>
+<span class="o">ti-lex ❯</span> La facture indique un total de 48,30 $.</pre></div>
+  </div>
+  <p class="note">Le Chat peut aussi « voir » une image grâce à <code>/image</code> — même si son propre modèle ne gère pas les images, le modèle de vision la décrit et le Chat répond dessus.</p>
+
+  <h2 class="sec">À quoi ressemble Codex</h2>
+  <div class="term">
+    <div class="bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+      <span class="name">Mode Codex</span></div>
+    <div class="screen"><pre><span class="m">— Mode Codex — assistant de code —</span>
+
+<span class="prompt">toi ❯</span> <span class="you">écris-moi une fonction Python qui lit un fichier .txt</span>
+<span class="o">codex ❯</span> Voici une fonction simple et sûre :
+
+  <span class="bl">def</span> lire_texte(chemin):
+      <span class="bl">with</span> open(chemin, encoding=<span class="gn">"utf-8"</span>) <span class="bl">as</span> f:
+          <span class="bl">return</span> f.read()
+
+  Appel : <span class="gn">contenu = lire_texte("notes.txt")</span>
+  Je n'ai pas exécuté ce code ici — teste-le de ton côté.</pre></div>
+  </div>
+
+  <h2 class="sec">Commandes (dans tous les modes)</h2>
+  <table>
+    <thead><tr><th>Commande</th><th>Ce que ça fait</th></tr></thead>
+    <tbody>
+      <tr><td><code>/retenir …</code></td><td>Mémorise un fait partagé entre les 4 modes (ex. <code>/retenir je m'appelle Alex</code>).</td></tr>
+      <tr><td><code>/image &lt;chemin&gt; [question]</code></td><td>Décrit une image et l'ajoute à la conversation (Chat, Codex et REA).</td></tr>
+      <tr><td><code>/menu</code></td><td>Revient au menu des 4 modes.</td></tr>
+      <tr><td><code>/quit</code></td><td>Ferme LexOS Pro.</td></tr>
+    </tbody>
+  </table>
+  <p class="note">La mémoire est commune aux 4 modes : ce que tu dis à Chat, Heretic le sait aussi. REA apprend en plus de ses erreurs d'outils pour ne pas les refaire.</p>
+
+  <footer>Aperçu de l'interface — l'application réelle est le menu texte qui s'ouvre avec <code>demarrer-lexos-usb.sh</code>. Ceci est juste une maquette pour te montrer à quoi ça ressemble.</footer>
+</div>
