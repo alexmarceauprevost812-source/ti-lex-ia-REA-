@@ -105,6 +105,9 @@ class LexOSApp:
         self.f_small = font.Font(family=fam, size=9)
         self.f_logo = font.Font(family=fam, size=34, weight="bold")
         self.f_mode = font.Font(family=fam, size=16, weight="bold")
+        self.f_rain = font.Font(family=fam, size=13)
+        self._rain_cols: list[int] = []
+        self._rain_chars = "01010110ABCDEF0123456789ﾊﾐｦｯ"
 
         self.home = tk.Frame(self.root, bg=BG)
         self.chat = tk.Frame(self.root, bg=BG)
@@ -112,11 +115,17 @@ class LexOSApp:
         self._build_chat()
         self._show_home()
         self.root.after(100, self._drain_queue)
+        self.root.after(300, self._matrix_tick)
 
     # ---- écran d'accueil (choix au centre) ------------------------------
     def _build_home(self) -> None:
         tk = self.tk
-        # Un conteneur centré verticalement et horizontalement.
+        # Fond « pluie matrix » : une toile qui remplit l'accueil, DERRIÈRE le
+        # menu (créée avant « center », donc dessous dans l'ordre d'empilement).
+        self.rain = tk.Canvas(self.home, bg=BG, highlightthickness=0)
+        self.rain.place(x=0, y=0, relwidth=1, relheight=1)
+
+        # Un conteneur centré verticalement et horizontalement, par-dessus la toile.
         center = tk.Frame(self.home, bg=BG)
         center.place(relx=0.5, rely=0.5, anchor="center")
 
@@ -197,6 +206,41 @@ class LexOSApp:
         self.status = tk.Label(self.chat, text="", bg=PANEL, fg=MUTED, anchor="w",
                                font=self.f_small, padx=12, pady=4)
         self.status.pack(fill="x", side="bottom")
+
+    def _matrix_tick(self) -> None:
+        """Dessine une image de la pluie matrix en fond de l'accueil, puis se
+        reprogramme. On ne dessine que quand l'accueil est visible, pour ne pas
+        consommer de CPU pendant une conversation."""
+        import random
+        try:
+            visible = self.home.winfo_ismapped()
+        except Exception:
+            return
+        if visible:
+            c = self.rain
+            w = max(c.winfo_width(), 1)
+            h = max(c.winfo_height(), 1)
+            cw, rh = 16, 18
+            ncols = max(1, w // cw)
+            rows = max(1, h // rh)
+            if len(self._rain_cols) != ncols:
+                self._rain_cols = [random.randint(-rows, 0) for _ in range(ncols)]
+            # Dégradé de verts : tête claire, traîne qui s'assombrit.
+            colors = ["#eafff0", "#8affaf", "#5fe08c", "#3faf68", "#2b7d4a", "#1f5e38", "#164326"]
+            trail = len(colors)
+            c.delete("rain")
+            for i in range(ncols):
+                head = self._rain_cols[i]
+                for k in range(trail):
+                    ry = head - k
+                    if 0 <= ry <= rows:
+                        c.create_text(i * cw + cw // 2, ry * rh + rh // 2,
+                                      text=random.choice(self._rain_chars),
+                                      fill=colors[k], font=self.f_rain, tags="rain")
+                self._rain_cols[i] = head + 1
+                if head - trail > rows and random.random() < 0.5:
+                    self._rain_cols[i] = random.randint(-rows // 2, 0)
+        self.root.after(120, self._matrix_tick)
 
     def _show_home(self) -> None:
         if self.busy:
