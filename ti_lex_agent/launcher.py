@@ -85,6 +85,12 @@ def resolve_model(client: OllamaClient, primary: str, fallback: str, label: str)
     except OllamaError as e:
         print(f"Erreur : {e}")
         return None
+    if not available:
+        print(
+            "Erreur : aucun modèle n'est installé dans Ollama.\n"
+            f"    Installe-en un avec : ollama pull {primary}"
+        )
+        return None
     if _has_model(available, primary):
         return primary
     print(f"{GREY}« {primary} » n'est pas installé sur ce PC — "
@@ -94,11 +100,16 @@ def resolve_model(client: OllamaClient, primary: str, fallback: str, label: str)
             print(f"{GREY}Note : « {fallback} » est un modèle normal, PAS décensuré — "
                   f"Heretic doit d'abord tourner dessus pour ça (voir /heretic).{RESET}")
         return fallback
-    print(
-        f"Erreur : ni « {primary} » ni « {fallback} » ne sont installés.\n"
-        f"    Installe-en un avec : ollama pull {fallback}"
-    )
-    return None
+    # Dernier recours : ni le principal ni le repli nommé ne sont là, mais au
+    # moins un modèle existe. On le prend plutôt que de bloquer le menu — c'est
+    # exactement le but du repli : fonctionner avec ce qui est présent.
+    chosen = available[0]
+    print(f"{GREY}« {fallback} » non plus — utilisation de « {chosen} » (seul modèle "
+          f"disponible).{RESET}")
+    if label == "Heretic":
+        print(f"{GREY}Note : « {chosen} » est un modèle normal, PAS décensuré — "
+              f"Heretic doit d'abord tourner dessus pour ça (voir /heretic).{RESET}")
+    return chosen
 
 
 def _handle_image(config: Config, client: OllamaClient, messages: list[dict], text: str) -> None:

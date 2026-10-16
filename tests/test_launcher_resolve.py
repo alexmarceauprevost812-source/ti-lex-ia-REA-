@@ -31,3 +31,17 @@ def test_resolve_returns_none_when_nothing_installed(capsys):
     result = resolve_model(FakeClient([]), "heretic:latest", "llama3.2:1b", "Heretic")
     assert result is None
     assert "ollama pull" in capsys.readouterr().out
+
+
+def test_resolve_uses_any_model_as_last_resort(capsys):
+    # Ni le principal ni le repli nommé ne sont là, mais un autre modèle existe :
+    # on le prend au lieu de bloquer le menu.
+    result = resolve_model(FakeClient(["qwen3:8b"]), "qwen3-vl:4b", "llama3.2:1b", "Chat")
+    assert result == "qwen3:8b"
+    assert "seul modèle disponible" in capsys.readouterr().out
+
+
+def test_resolve_last_resort_warns_not_decensored_for_heretic(capsys):
+    result = resolve_model(FakeClient(["qwen3:8b"]), "heretic:latest", "llama3.2:1b", "Heretic")
+    assert result == "qwen3:8b"
+    assert "PAS décensuré" in capsys.readouterr().out
