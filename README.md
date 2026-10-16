@@ -170,10 +170,22 @@ travail ; change l'emplacement avec `TILEX_MEMORY` pour le garder sur la clé US
 Supprimer avant de confirmer que ça marche te laisse sans aucun modèle nulle part.
 
 **1. Copie les modèles Ollama du disque interne vers la clé** (remplace le chemin par
-l'endroit où ta clé est montée) :
+l'endroit où ta clé est montée). On met `--no-owner --no-group --no-perms` parce
+qu'exFAT ne gère pas les propriétaires/permissions Unix : sans ces options, `rsync`
+affiche plein de `chown ... Operation not permitted` (sans gravité, le contenu se copie
+quand même, mais c'est plus propre de les enlever) :
 ```bash
+rm -rf /media/marceau/LEXOS/ollama-models
 mkdir -p /media/marceau/LEXOS/ollama-models
-sudo rsync -av --progress /usr/share/ollama/.ollama/models/ /media/marceau/LEXOS/ollama-models/
+sudo rsync -rtv --no-owner --no-group --no-perms --progress \
+    /usr/share/ollama/.ollama/models/ /media/marceau/LEXOS/ollama-models/
+```
+**Laisse le copiage finir COMPLÈTEMENT** (il affiche les gros `blobs/` en premier, les
+petits `manifests/` en dernier). Avant de continuer, vérifie que les manifestes sont bien
+arrivés — sans eux, Ollama démarre avec « total blobs: 0 » et ne voit aucun modèle :
+```bash
+du -sh /media/marceau/LEXOS/ollama-models               # doit être proche de la taille source
+find /media/marceau/LEXOS/ollama-models/manifests -type f | wc -l   # doit être > 0
 ```
 
 **2. Copie aussi le projet sur la clé** (pour qu'il n'ait plus besoin du disque interne).
@@ -181,11 +193,17 @@ Une clé formatée exFAT/FAT ne supporte pas les liens symboliques — et `pytho
 en crée toujours un (`lib64`), **même avec `--copies`** sur Debian/LexOS Pro, donc un
 `.venv` ne peut pas vivre sur la clé. On n'en a pas besoin : `pip install --target`
 installe le projet et ses dépendances comme de simples fichiers, dans un dossier à
-côté, sans aucun lien symbolique :
+côté, sans aucun lien symbolique. On exclut aussi `.git` : la clé est une copie à
+utiliser, pas un dépôt à versionner — garder `.git` dessus fait échouer `git pull` avec
+« modifications locales seraient écrasées ». **Les mises à jour se font toujours sur le
+PC (`git pull` dans `~/ti-lex-ia-REA-`), puis on recopie** :
 ```bash
-rsync -a --exclude='.venv' --exclude='deps' ~/ti-lex-ia-REA-/ /media/marceau/LEXOS/ti-lex-ia-REA-/
+cd ~/ti-lex-ia-REA- && git pull       # mets à jour sur le PC d'abord
+rsync -rt --no-owner --no-group --no-perms --delete \
+    --exclude='.venv' --exclude='deps' --exclude='.git' \
+    ~/ti-lex-ia-REA-/ /media/marceau/LEXOS/ti-lex-ia-REA-/
 cd /media/marceau/LEXOS/ti-lex-ia-REA-
-python3 -m pip install --target=deps --upgrade .
+python3 -m pip install --target=deps --upgrade .      # une seule fois (et après chaque git pull)
 ```
 
 **3. Teste que tout marche DEPUIS LA CLÉ, sans toucher au disque interne** :
