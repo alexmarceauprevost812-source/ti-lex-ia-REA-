@@ -40,41 +40,32 @@ fi
 
 echo "== Modèles utilisés : $MODELS (PAS le disque interne) =="
 
-# On repart toujours d'un Ollama propre, pointé sur la clé. Si une instance
-# tourne déjà (service système OU "ollama serve" resté en mémoire d'un essai
-# précédent), elle répond sur le port 11434 mais avec SON dossier de modèles
-# à elle, pas forcément celui de la clé — d'où une liste de modèles vide ou
-# fausse. On l'arrête donc systématiquement avant de relancer.
-if systemctl is-active --quiet ollama 2>/dev/null; then
-    echo "Arrêt du service ollama système..."
-    sudo systemctl stop ollama
-fi
-if pgrep -f "ollama serve" >/dev/null 2>&1; then
-    echo "Arrêt d'une instance ollama déjà en mémoire..."
-    pkill -f "ollama serve" || true
-fi
-# Attend que le port se libère avant de relancer (jusqu'à 10s).
-for _ in $(seq 1 10); do
-    curl -s -o /dev/null http://localhost:11434/api/tags || break
-    sleep 1
-done
+# On lance NOTRE Ollama sur un port séparé (11435 par défaut), pointé sur les
+# modèles de la clé. Avantage : aucun besoin d'arrêter l'Ollama système (port
+# 11434), donc AUCUN mot de passe sudo — le lancement en un clic marche.
+# L'appli lit OLLAMA_HOST, donc on la fait parler à notre port.
+PORT="${LEXOS_OLLAMA_PORT:-11435}"
+ADRESSE="127.0.0.1:$PORT"
 
-# Relance Ollama en arrière-plan, pointé uniquement sur la clé.
-export OLLAMA_MODELS="$MODELS"
-echo "Démarrage d'Ollama sur les modèles de la clé..."
-nohup ollama serve >"$CLE/ollama.log" 2>&1 &
-# Une clé USB est plus lente qu'un disque interne : on attend qu'Ollama
-# réponde vraiment au lieu d'un délai fixe (sinon la liste des modèles
-# peut apparaître vide alors qu'Ollama démarre encore).
-for _ in $(seq 1 30); do
-    if curl -s -o /dev/null http://localhost:11434/api/tags; then
-        break
-    fi
-    sleep 1
-done
+if ! curl -s -o /dev/null "http://$ADRESSE/api/tags"; then
+    echo "Démarrage d'Ollama (port $PORT) sur les modèles de la clé..."
+    OLLAMA_MODELS="$MODELS" OLLAMA_HOST="$ADRESSE" nohup ollama serve >"$CLE/ollama.log" 2>&1 &
+    # Une clé USB est plus lente qu'un disque interne : on attend qu'Ollama
+    # réponde vraiment au lieu d'un délai fixe (sinon la liste des modèles
+    # peut apparaître vide alors qu'Ollama démarre encore).
+    for _ in $(seq 1 30); do
+        if curl -s -o /dev/null "http://$ADRESSE/api/tags"; then
+            break
+        fi
+        sleep 1
+    done
+fi
+
+# L'appli parlera à NOTRE Ollama (celui de la clé), pas à celui du système.
+export OLLAMA_HOST="http://$ADRESSE"
 
 echo "== Modèles disponibles =="
-REPONSE=$(curl -s http://localhost:11434/api/tags)
+REPONSE=$(curl -s "http://$ADRESSE/api/tags")
 echo "$REPONSE" | grep -o '"name":"[^"]*"' || true
 if ! echo "$REPONSE" | grep -q '"name":"'; then
     echo "(aucun modèle trouvé — regarde $CLE/ollama.log si ça persiste)"

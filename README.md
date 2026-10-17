@@ -226,8 +226,10 @@ python3 -m pip install --target=deps --upgrade .      # une seule fois (et aprè
 ```bash
 bash scripts/demarrer-lexos-usb.sh /media/marceau/LEXOS
 ```
-Essaie les 4 modes (surtout Heretic). Si un modèle manque ou qu'une erreur apparaît, le
-disque interne a encore tout — rien n'est perdu, tu peux corriger et réessayer.
+Le script lance Ollama sur un **port séparé (11435)** avec les modèles de la clé, donc
+il n'a **pas besoin de sudo** et ne touche pas à l'Ollama du système. Essaie les 5 modes
+(surtout Heretic). Si un modèle manque ou qu'une erreur apparaît, le disque interne a
+encore tout — rien n'est perdu, tu peux corriger et réessayer.
 
 **4. Seulement si l'étape 3 fonctionne bien**, libère le disque interne :
 ```bash
@@ -242,10 +244,11 @@ branchée, le PC n'a plus aucun modèle — exactement ce que tu voulais.
 
 ## Tout lancer en un clic depuis la clé
 
-Copie les deux fichiers du dossier `cle-usb/` du dépôt **à la racine de la clé**, à côté
-(pas dedans) du dossier `ti-lex-ia-REA-` :
+Copie les fichiers du dossier `cle-usb/` du dépôt **à la racine de la clé**, à côté
+(pas dedans) du dossier `ti-lex-ia-REA-` — y compris `lexos-icon.png`, l'icône LexTI
+affichée par le lanceur :
 ```bash
-cp cle-usb/LANCER-LEXOS-PRO.sh cle-usb/LexOS-Pro.desktop /media/marceau/LEXOS/
+cp cle-usb/LANCER-LEXOS-PRO.sh cle-usb/LexOS-Pro.desktop cle-usb/lexos-icon.png /media/marceau/LEXOS/
 chmod +x /media/marceau/LEXOS/LANCER-LEXOS-PRO.sh /media/marceau/LEXOS/LexOS-Pro.desktop
 ```
 
