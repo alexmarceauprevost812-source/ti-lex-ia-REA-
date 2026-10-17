@@ -453,13 +453,18 @@ class LexOSApp:
         try:
             if self.agent is not None:
                 answer = self.agent.run(text)
+                self.queue.put(("answer", answer + "\n"))
             else:
+                # Modes simples : flux mot par mot pour qu'on voie la réponse
+                # arriver (le 1er chargement du modèle peut prendre un moment).
                 self.messages.append({"role": "user", "content": text})
-                reply = self.client.chat(self.messages, model=self.model,
-                                         options=self.options or None)
-                answer = reply.get("content", "").strip()
-                self.messages.append({"role": "assistant", "content": answer})
-            self.queue.put(("answer", answer + "\n"))
+                full = ""
+                for chunk in self.client.chat_stream(self.messages, model=self.model,
+                                                     options=self.options or None):
+                    full += chunk
+                    self.queue.put(("chunk", chunk))
+                self.messages.append({"role": "assistant", "content": full.strip()})
+                self.queue.put(("chunk", "\n"))
         except OllamaError as e:
             self.queue.put(("error", f"\n{e}\n"))
         except Exception as e:  # pragma: no cover - garde-fou UI
@@ -472,6 +477,8 @@ class LexOSApp:
             while True:
                 kind, payload = self.queue.get_nowait()
                 if kind == "answer":
+                    self._write(payload, "body")
+                elif kind == "chunk":
                     self._write(payload, "body")
                 elif kind == "tool":
                     self._write(payload, "tool")

@@ -45,6 +45,47 @@ class OllamaClient:
             raise OllamaError(f"Ollama a répondu {r.status_code} : {r.text[:300]}")
         return r.json()["message"]
 
+    def chat_stream(self, messages: list[dict], model: str | None = None,
+                    options: dict | None = None):
+        """Comme chat(), mais en flux : génère les morceaux de texte au fur et à
+        mesure, pour que l'interface les affiche en direct au lieu d'attendre."""
+        import json
+        payload: dict = {
+            "model": model or self.config.model,
+            "messages": messages,
+            "stream": True,
+        }
+        if options:
+            payload["options"] = options
+        try:
+            r = requests.post(
+                f"{self.config.ollama_host}/api/chat",
+                json=payload,
+                timeout=self.config.request_timeout,
+                stream=True,
+            )
+        except requests.ConnectionError as e:
+            raise OllamaError(
+                f"Impossible de joindre Ollama à {self.config.ollama_host}. "
+                "Est-il lancé ? (commande : ollama serve)"
+            ) from e
+        if r.status_code != 200:
+            raise OllamaError(f"Ollama a répondu {r.status_code} : {r.text[:300]}")
+        for line in r.iter_lines():
+            if not line:
+                continue
+            try:
+                data = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if data.get("error"):
+                raise OllamaError(str(data["error"]))
+            chunk = (data.get("message") or {}).get("content", "")
+            if chunk:
+                yield chunk
+            if data.get("done"):
+                break
+
     def list_models(self) -> list[str]:
         """Liste les modèles déjà présents dans Ollama (GET /api/tags)."""
         try:
