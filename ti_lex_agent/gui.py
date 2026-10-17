@@ -32,7 +32,7 @@ from .launcher import (
     _env_model,
     _has_model,
 )
-from .memory import remember, with_memory
+from .memory import load_memory, memory_path, remember, with_memory
 from .modelops import (
     ModelOpsError,
     copy_model,
@@ -248,10 +248,19 @@ class LexOSApp:
         tk.Button(top, text="Effacer", bg=PANEL, fg=MUTED, activebackground=EDGE,
                   activeforeground=FG, bd=0, font=self.f_body, cursor="hand2",
                   command=lambda: self._reset_conversation(True)).pack(side="right", padx=8)
+        # Le « cerveau » partagé : faits mémorisés (/retenir) + erreurs apprises.
+        tk.Button(top, text="🧠 Cerveau", bg=PANEL, fg=BLUE, activebackground=EDGE,
+                  activeforeground=BLUE, bd=0, font=self.f_body, cursor="hand2",
+                  command=self._show_brain).pack(side="right", padx=8)
         # Gestionnaire de modèles — visible seulement en mode Heretic.
         self.models_btn = tk.Button(top, text="⚙ Modèles", bg=PANEL, fg=ORANGE,
                                      activebackground=EDGE, activeforeground=ORANGE, bd=0,
                                      font=self.f_bold, cursor="hand2", command=self._models_manager)
+        # Choix du dossier de projet — visible pour REA et Codex-Terminal, pour
+        # que l'agent travaille sur de VRAIS fichiers de projet.
+        self.project_btn = tk.Button(top, text="📁 Projet", bg=PANEL, fg=GREEN,
+                                     activebackground=EDGE, activeforeground=GREEN, bd=0,
+                                     font=self.f_body, cursor="hand2", command=self._choose_project)
 
         self.view = tk.Text(self.chat, bg=BG, fg=FG, wrap="word", bd=0, padx=16, pady=10,
                             font=self.f_body, insertbackground=FG, state="disabled",
@@ -350,11 +359,14 @@ class LexOSApp:
         self.model, note = choose_model(available, primary, fallback)
         self._reset_conversation(announce=True)
         self.header.configure(text=f"{title}   ·   {self.model or 'aucun modèle'}")
-        # Le gestionnaire de modèles n'apparaît que dans Heretic.
+        # Le gestionnaire de modèles n'apparaît que dans Heretic ; le choix du
+        # dossier de projet, que pour les modes agent (REA, Codex-Terminal).
+        self.models_btn.pack_forget()
+        self.project_btn.pack_forget()
         if key == "heretic":
             self.models_btn.pack(side="right", padx=8)
-        else:
-            self.models_btn.pack_forget()
+        if key in AGENT_MODES:
+            self.project_btn.pack(side="right", padx=8)
         extra = ""
         if key == "heretic" and self.model and self.model != "heretic:latest":
             extra = "  ⚠ modèle de repli NON décensuré."
@@ -494,6 +506,47 @@ class LexOSApp:
             self.queue.put(("error", f"{e}\n"))
         finally:
             self.queue.put(("done", ""))
+
+    # ---- dossier de projet (pour REA / Codex-Terminal) ------------------
+    def _choose_project(self) -> None:
+        if self.busy:
+            return
+        folder = self.filedialog.askdirectory(
+            title="Dossier du projet où l'agent va travailler")
+        if not folder:
+            return
+        from pathlib import Path as _P
+        self.config.workspace = _P(folder).resolve()
+        self.config.workspace.mkdir(parents=True, exist_ok=True)
+        # Reconstruit l'agent pour qu'il lise/écrive dans ce dossier.
+        self._reset_conversation(announce=True)
+        self._write(f"📁 Dossier de projet : {self.config.workspace}\n", "tool")
+        self._set_status(f"Projet : {self.config.workspace}")
+
+    # ---- le « cerveau » : mémoire partagée (faits + erreurs apprises) ----
+    def _show_brain(self) -> None:
+        tk = self.tk
+        win = tk.Toplevel(self.root)
+        win.title("Cerveau — mémoire partagée")
+        win.configure(bg=BG)
+        win.geometry("560x460")
+        win.transient(self.root)
+        tk.Label(win, text="🧠 Ce que l'IA a retenu (partagé par tous les modes)",
+                 bg=BG, fg=ORANGE, font=self.f_bold).pack(anchor="w", padx=14, pady=(14, 2))
+        tk.Label(win, text=f"Fichier : {memory_path(self.config)}", bg=BG, fg=MUTED,
+                 font=self.f_small, wraplength=520, justify="left").pack(anchor="w", padx=14)
+        txt = tk.Text(win, bg=PANEL, fg=FG, wrap="word", bd=0, padx=10, pady=8,
+                      font=self.f_small, insertbackground=FG)
+        txt.pack(fill="both", expand=True, padx=14, pady=8)
+        content = load_memory(self.config).strip()
+        txt.insert("1.0", content or
+                   "(Vide pour l'instant.)\n\nL'IA ajoute ici :\n"
+                   "• les faits que tu mémorises avec /retenir\n"
+                   "• les erreurs d'outils rencontrées, pour ne pas les refaire.")
+        txt.configure(state="disabled")
+        tk.Button(win, text="Fermer", bg=BG, fg=MUTED, activebackground=BG,
+                  activeforeground=FG, bd=0, font=self.f_small, cursor="hand2",
+                  command=win.destroy).pack(pady=(0, 10))
 
     # ---- capture d'écran ------------------------------------------------
     def _capture_screen(self) -> None:
