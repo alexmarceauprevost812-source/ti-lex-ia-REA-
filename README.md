@@ -155,13 +155,21 @@ travail ; change l'emplacement avec `TILEX_MEMORY` pour le garder sur la clé US
 - **Linux et Windows** : le code est en Python pur ; installe Python, Ollama, puis
   `pip install -e .` des deux côtés. Sous Windows, lance avec PowerShell ou CMD
   (`python -m ti_lex_agent.launcher`).
-- **Android** : un téléphone ne peut pas faire tourner `heretic:latest` (18 Go, besoin d'une
-  carte graphique). La seule façon réaliste est de se connecter **par le réseau** à Ollama lancé
-  sur ton PC :
-  1. Sur le PC : `OLLAMA_HOST=0.0.0.0 ollama serve` (ouvre Ollama au réseau local)
-  2. Sur le téléphone : installe [Termux](https://termux.dev/), puis
-     `pkg install python && pip install requests ddgs`
-  3. Clone le dépôt et lance avec `OLLAMA_HOST=http://IP-DU-PC:11434 python -m ti_lex_agent.launcher`
+- **Android (depuis le téléphone, même avec le code sur la clé)** : un téléphone ne peut
+  pas faire tourner `heretic:latest` (18 Go, besoin d'une carte graphique), **même depuis
+  une clé USB**. Le téléphone sert de **télécommande** : il fait tourner le menu et parle à
+  l'IA de ton PC **par le WiFi** (c'est le PC qui calcule). Sur Android c'est le **menu
+  texte** qui s'ouvre (la fenêtre graphique a besoin d'un écran de bureau).
+  Note : les dépendances copiées sur la clé sont compilées pour le PC (x86), **pas** pour un
+  téléphone (ARM) — le téléphone installe donc ses propres dépendances (léger, aucun modèle
+  à télécharger). Le **code** du projet, lui, peut venir de la clé.
+  1. **Sur le PC**, partage l'IA sur le WiFi :
+     `LEXOS_OLLAMA_BIND=0.0.0.0 bash scripts/demarrer-lexos-usb.sh /media/marceau/LEXOS`
+     puis trouve l'IP du PC : `ip a` (ex : `192.168.0.42`).
+  2. **Sur le téléphone** : installe [Termux](https://termux.dev/), puis
+     `pkg install python git`. Récupère le code (copié depuis la clé, ou `git clone`).
+  3. Lance : `bash scripts/demarrer-telephone.sh 192.168.0.42`
+     (le script installe les dépendances du téléphone au besoin et ouvre le menu).
   Le téléphone n'exécute pas le modèle : il envoie tes messages au PC et reçoit la réponse.
 
 ## Vider le PC — tout sur la clé USB-C seulement

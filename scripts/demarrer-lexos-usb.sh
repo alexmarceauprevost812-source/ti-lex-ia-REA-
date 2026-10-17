@@ -45,16 +45,21 @@ echo "== Modèles utilisés : $MODELS (PAS le disque interne) =="
 # 11434), donc AUCUN mot de passe sudo — le lancement en un clic marche.
 # L'appli lit OLLAMA_HOST, donc on la fait parler à notre port.
 PORT="${LEXOS_OLLAMA_PORT:-11435}"
-ADRESSE="127.0.0.1:$PORT"
+# Adresse d'écoute : 127.0.0.1 = PC seulement (défaut, sûr). Mets
+# LEXOS_OLLAMA_BIND=0.0.0.0 pour que ton TÉLÉPHONE sur le même WiFi puisse s'y
+# connecter (voir scripts/demarrer-telephone.sh).
+BIND="${LEXOS_OLLAMA_BIND:-127.0.0.1}"
+ADRESSE="$BIND:$PORT"
+LOCAL="127.0.0.1:$PORT"   # côté client (l'appli, les vérifs) : toujours en local
 
-if ! curl -s -o /dev/null "http://$ADRESSE/api/tags"; then
-    echo "Démarrage d'Ollama (port $PORT) sur les modèles de la clé..."
+if ! curl -s -o /dev/null "http://$LOCAL/api/tags"; then
+    echo "Démarrage d'Ollama (écoute $ADRESSE) sur les modèles de la clé..."
     OLLAMA_MODELS="$MODELS" OLLAMA_HOST="$ADRESSE" nohup ollama serve >"$CLE/ollama.log" 2>&1 &
     # Une clé USB est plus lente qu'un disque interne : on attend qu'Ollama
     # réponde vraiment au lieu d'un délai fixe (sinon la liste des modèles
     # peut apparaître vide alors qu'Ollama démarre encore).
     for _ in $(seq 1 30); do
-        if curl -s -o /dev/null "http://$ADRESSE/api/tags"; then
+        if curl -s -o /dev/null "http://$LOCAL/api/tags"; then
             break
         fi
         sleep 1
@@ -62,10 +67,10 @@ if ! curl -s -o /dev/null "http://$ADRESSE/api/tags"; then
 fi
 
 # L'appli parlera à NOTRE Ollama (celui de la clé), pas à celui du système.
-export OLLAMA_HOST="http://$ADRESSE"
+export OLLAMA_HOST="http://$LOCAL"
 
 echo "== Modèles disponibles =="
-REPONSE=$(curl -s "http://$ADRESSE/api/tags")
+REPONSE=$(curl -s "http://$LOCAL/api/tags")
 echo "$REPONSE" | grep -o '"name":"[^"]*"' || true
 if ! echo "$REPONSE" | grep -q '"name":"'; then
     echo "(aucun modèle trouvé — regarde $CLE/ollama.log si ça persiste)"
