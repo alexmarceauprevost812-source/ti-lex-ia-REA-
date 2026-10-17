@@ -242,6 +242,9 @@ class LexOSApp:
         tk.Button(top, text="Image", bg=PANEL, fg=BLUE, activebackground=EDGE,
                   activeforeground=BLUE, bd=0, font=self.f_body, cursor="hand2",
                   command=self._attach_image).pack(side="right", padx=8)
+        tk.Button(top, text="Écran", bg=PANEL, fg=BLUE, activebackground=EDGE,
+                  activeforeground=BLUE, bd=0, font=self.f_body, cursor="hand2",
+                  command=self._capture_screen).pack(side="right", padx=8)
         tk.Button(top, text="Effacer", bg=PANEL, fg=MUTED, activebackground=EDGE,
                   activeforeground=FG, bd=0, font=self.f_body, cursor="hand2",
                   command=lambda: self._reset_conversation(True)).pack(side="right", padx=8)
@@ -489,6 +492,33 @@ class LexOSApp:
             self.queue.put(("answer", f"[{path.name}] {description}\n"))
         except OllamaError as e:
             self.queue.put(("error", f"{e}\n"))
+        finally:
+            self.queue.put(("done", ""))
+
+    # ---- capture d'écran ------------------------------------------------
+    def _capture_screen(self) -> None:
+        if self.busy or self.model is None:
+            return
+        self._write("📸 Capture d'écran — analyse…\n", "tool")
+        self._set_busy(True)
+        threading.Thread(target=self._capture_worker, daemon=True).start()
+
+    def _capture_worker(self) -> None:
+        import time
+        from .screenshot import ScreenshotError, take_screenshot
+        try:
+            dest = self.config.workspace / f"capture-{int(time.time())}.png"
+            take_screenshot(dest)
+            description = self.client.describe_image(dest, "Décris ce qui est affiché à l'écran.")
+            target = self.agent.messages if self.agent is not None else self.messages
+            target.append({"role": "user", "content": f"[Capture d'écran]\n{description}"})
+            self.queue.put(("answer", f"[écran] {description}\n"))
+        except ScreenshotError as e:
+            self.queue.put(("error", f"{e}\n"))
+        except OllamaError as e:
+            self.queue.put(("error", f"{e}\n"))
+        except Exception as e:  # pragma: no cover
+            self.queue.put(("error", f"Erreur : {e}\n"))
         finally:
             self.queue.put(("done", ""))
 
