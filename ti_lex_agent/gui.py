@@ -165,9 +165,16 @@ class LexOSApp:
 
         self.root = tk.Tk()
         self.root.title("LexOS Pro — IA locale")
-        self.root.geometry("960x660")
         self.root.minsize(680, 500)
         self.root.configure(bg=BG)
+        # Ouvre la fenêtre CENTRÉE sur l'écran (au lieu du coin haut-gauche).
+        win_w, win_h = 960, 660
+        self.root.update_idletasks()
+        screen_w = self.root.winfo_screenwidth()
+        screen_h = self.root.winfo_screenheight()
+        pos_x = max(0, (screen_w - win_w) // 2)
+        pos_y = max(0, (screen_h - win_h) // 2)
+        self.root.geometry(f"{win_w}x{win_h}+{pos_x}+{pos_y}")
 
         fam = font.nametofont("TkFixedFont").actual("family")
         self.f_body = font.Font(family=fam, size=11)
