@@ -44,7 +44,8 @@ from .modelops import (
     show_model,
 )
 from .ollama_client import OllamaClient, OllamaError
-from .tools import IMAGE_EXTENSIONS
+from .params import DEFAULTS, PARAMS, set_param
+from .tools import IMAGE_EXTENSIONS, Toolbox
 
 # Couleurs du thème LexOS.
 BG = "#0b0b0d"
@@ -159,6 +160,8 @@ class LexOSApp:
         self.model: str | None = None
         self.messages: list[dict] = []
         self.agent: Agent | None = None
+        # Réglages de génération (température, etc.), partagés par tous les modes.
+        self.options: dict = dict(DEFAULTS)
 
         self.root = tk.Tk()
         self.root.title("LexOS Pro — IA locale")
@@ -245,6 +248,10 @@ class LexOSApp:
         tk.Button(top, text="Écran", bg=PANEL, fg=BLUE, activebackground=EDGE,
                   activeforeground=BLUE, bd=0, font=self.f_body, cursor="hand2",
                   command=self._capture_screen).pack(side="right", padx=8)
+        # Accès web dans TOUS les modes (Chat, Codex, Heretic aussi), pas que REA.
+        tk.Button(top, text="🌐 Web", bg=PANEL, fg=BLUE, activebackground=EDGE,
+                  activeforeground=BLUE, bd=0, font=self.f_body, cursor="hand2",
+                  command=self._web_search).pack(side="right", padx=8)
         tk.Button(top, text="Effacer", bg=PANEL, fg=MUTED, activebackground=EDGE,
                   activeforeground=FG, bd=0, font=self.f_body, cursor="hand2",
                   command=lambda: self._reset_conversation(True)).pack(side="right", padx=8)
@@ -252,6 +259,10 @@ class LexOSApp:
         tk.Button(top, text="🧠 Cerveau", bg=PANEL, fg=BLUE, activebackground=EDGE,
                   activeforeground=BLUE, bd=0, font=self.f_body, cursor="hand2",
                   command=self._show_brain).pack(side="right", padx=8)
+        # Réglages de génération (température, top_p, …) pour des réponses + directes.
+        tk.Button(top, text="🎚 Réglages", bg=PANEL, fg=ORANGE, activebackground=EDGE,
+                  activeforeground=ORANGE, bd=0, font=self.f_body, cursor="hand2",
+                  command=self._params_panel).pack(side="right", padx=8)
         # Gestionnaire de modèles — visible seulement en mode Heretic.
         self.models_btn = tk.Button(top, text="⚙ Modèles", bg=PANEL, fg=ORANGE,
                                      activebackground=EDGE, activeforeground=ORANGE, bd=0,
@@ -386,7 +397,7 @@ class LexOSApp:
             # Codex-Terminal utilise son prompt shell (MODES[key][2]).
             self.agent = Agent(self.config, self.client, confirm=self._gui_confirm,
                                on_event=lambda m: self.queue.put(("tool", m + "\n")),
-                               system_prompt=system)
+                               system_prompt=system, options=self.options)
             self.messages = []
         else:
             self.agent = None
@@ -444,7 +455,8 @@ class LexOSApp:
                 answer = self.agent.run(text)
             else:
                 self.messages.append({"role": "user", "content": text})
-                reply = self.client.chat(self.messages, model=self.model)
+                reply = self.client.chat(self.messages, model=self.model,
+                                         options=self.options or None)
                 answer = reply.get("content", "").strip()
                 self.messages.append({"role": "assistant", "content": answer})
             self.queue.put(("answer", answer + "\n"))
@@ -507,6 +519,66 @@ class LexOSApp:
         finally:
             self.queue.put(("done", ""))
 
+    # ---- réglages de génération (température, etc.) ----------------------
+    def _params_panel(self) -> None:
+        """Fenêtre pour régler température, top_p, top_k, etc. — appliqués en
+        direct à tous les modes (réponses plus ou moins directes/créatives)."""
+        tk = self.tk
+        win = tk.Toplevel(self.root)
+        win.title("Réglages du modèle")
+        win.configure(bg=BG)
+        win.geometry("520x420")
+        win.transient(self.root)
+        tk.Label(win, text="🎚 Réglages de génération", bg=BG, fg=ORANGE,
+                 font=self.f_bold).pack(anchor="w", padx=14, pady=(14, 2))
+        tk.Label(win, text="Vide = valeur par défaut du modèle. Température haute = réponses "
+                 "plus directes/variées ; basse = plus stables.", bg=BG, fg=MUTED,
+                 font=self.f_small, wraplength=480, justify="left").pack(anchor="w", padx=14, pady=(0, 8))
+
+        entries: dict[str, object] = {}
+        form = tk.Frame(win, bg=BG)
+        form.pack(fill="x", padx=14)
+        for i, (key, (_kind, low, high, text)) in enumerate(PARAMS.items()):
+            tk.Label(form, text=key, bg=BG, fg=ORANGE, font=self.f_bold, anchor="w",
+                     width=14).grid(row=i, column=0, sticky="w", pady=3)
+            e = tk.Entry(form, bg=PANEL, fg=FG, insertbackground=ORANGE, bd=0, font=self.f_body, width=10)
+            if key in self.options:
+                e.insert(0, str(self.options[key]))
+            e.grid(row=i, column=1, sticky="w", padx=6)
+            tk.Label(form, text=f"[{low:g}–{high:g}] {text}", bg=BG, fg=MUTED,
+                     font=self.f_small, anchor="w", wraplength=300, justify="left").grid(row=i, column=2, sticky="w")
+            entries[key] = e
+        form.columnconfigure(2, weight=1)
+
+        msg = tk.Label(win, text="", bg=BG, fg=GREEN, font=self.f_small, anchor="w",
+                       wraplength=480, justify="left")
+        msg.pack(fill="x", padx=14, pady=(8, 2))
+
+        def apply():
+            errs = []
+            for key, e in entries.items():
+                raw = e.get().strip()
+                if not raw:
+                    self.options.pop(key, None)  # vide = défaut du modèle
+                    continue
+                try:
+                    set_param(self.options, key, raw)
+                except ValueError as ex:
+                    errs.append(str(ex))
+            if errs:
+                msg.configure(fg=RED, text=" / ".join(errs))
+            else:
+                applied = ", ".join(f"{k}={v}" for k, v in self.options.items()) or "(défauts du modèle)"
+                msg.configure(fg=GREEN, text=f"Appliqué : {applied}")
+
+        btns = tk.Frame(win, bg=BG)
+        btns.pack(fill="x", padx=14, pady=10)
+        tk.Button(btns, text="Appliquer", bg=ORANGE, fg=ORANGE_DK, activebackground=GREEN,
+                  bd=0, font=self.f_bold, cursor="hand2", padx=14, command=apply).pack(side="left")
+        tk.Button(btns, text="Fermer", bg=BG, fg=MUTED, activebackground=BG,
+                  activeforeground=FG, bd=0, font=self.f_small, cursor="hand2",
+                  command=win.destroy).pack(side="right")
+
     # ---- dossier de projet (pour REA / Codex-Terminal) ------------------
     def _choose_project(self) -> None:
         if self.busy:
@@ -547,6 +619,33 @@ class LexOSApp:
         tk.Button(win, text="Fermer", bg=BG, fg=MUTED, activebackground=BG,
                   activeforeground=FG, bd=0, font=self.f_small, cursor="hand2",
                   command=win.destroy).pack(pady=(0, 10))
+
+    # ---- recherche web (dans tous les modes) ----------------------------
+    def _web_search(self) -> None:
+        if self.busy or self.model is None:
+            return
+        query = self.simpledialog.askstring("Recherche web", "Que chercher sur le web ?", parent=self.root)
+        if not query:
+            return
+        self._write(f"🌐 Recherche web : {query}\n", "tool")
+        self._set_busy(True)
+        threading.Thread(target=self._web_worker, args=(query,), daemon=True).start()
+
+    def _web_worker(self, query: str) -> None:
+        try:
+            # On réutilise les outils web de l'agent (web_search), même en mode
+            # Chat/Codex/Heretic qui n'ont pas d'outils par eux-mêmes.
+            box = Toolbox(self.config, self.client)
+            results = box.tool_web_search(query)
+            target = self.agent.messages if self.agent is not None else self.messages
+            target.append({"role": "user",
+                           "content": f"[Résultats web pour « {query} »]\n{results}\n"
+                                      "Réponds à ma question en t'appuyant là-dessus."})
+            self.queue.put(("answer", f"{results}\n\n(Résultats ajoutés — pose ta question dessus.)\n"))
+        except Exception as e:  # pragma: no cover
+            self.queue.put(("error", f"Erreur de recherche web : {e}\n"))
+        finally:
+            self.queue.put(("done", ""))
 
     # ---- capture d'écran ------------------------------------------------
     def _capture_screen(self) -> None:
