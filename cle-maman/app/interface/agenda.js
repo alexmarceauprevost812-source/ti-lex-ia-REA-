@@ -195,18 +195,21 @@
   }
   function verifierRappels() {
     if (document.documentElement.classList.contains("verrouille")) return;
-    const maintenant = new Date(), auj = aujourdhui(), vus = dejaVus(), garder = {};
-    for (const [k, v] of Object.entries(vus)) if (k.startsWith(auj)) garder[k] = v;
-    for (const r of du(auj)) {
+    const maintenant = new Date(), auj = aujourdhui(), demain = iso(plus(new Date(), 1)), hier = iso(plus(new Date(), -1));
+    const vus = dejaVus(), garder = {};
+    for (const [k, v] of Object.entries(vus)) if (k.split("|")[0] >= hier) garder[k] = v;
+    // Aujourd'hui ET demain : un rappel « 1 h avant » d'un rendez-vous à 0 h 30
+    // tombe la veille au soir. L'heure de début vient de la date du rendez-vous.
+    for (const r of lire().filter((x) => x.date === auj || x.date === demain)) {
       if (!r.heure || r.rappel < 0) continue;
       const [h, m] = r.heure.split(":").map(Number);
-      const debut = new Date(); debut.setHours(h, m, 0, 0);
+      const debut = deIso(r.date); debut.setHours(h, m, 0, 0);
       const avant = new Date(debut.getTime() - r.rappel * 60000);
-      const cle = `${auj}|${r.id}|${r.heure}|${r.rappel}`;
+      const cle = `${r.date}|${r.id}|${r.heure}|${r.rappel}`;
       // Fenêtre de 10 minutes : on ne sonne pas pour un rendez-vous déjà loin derrière.
       if (maintenant >= avant && maintenant - avant < 10 * 60000 && !garder[cle]) {
         garder[cle] = 1;
-        toast(r.rappel ? `📅 Dans ${r.rappel >= 60 ? r.rappel / 60 + " h" : r.rappel + " minutes"}` : "📅 C'est l'heure !", `${heureFr(r.heure)} — ${r.titre}`);
+        toast(r.rappel ? `📅 Dans ${r.rappel >= 60 ? r.rappel / 60 + " h" : r.rappel + " minutes"}` : "📅 C'est l'heure !", `${r.date !== auj ? "Demain, " : ""}${heureFr(r.heure)} — ${r.titre}`);
       }
     }
     try { localStorage.setItem("agenda-rappels", JSON.stringify(garder)); } catch {}
