@@ -339,13 +339,15 @@
       });
     }
     if (courante && courante.messages[courante.messages.length - 1] === msg) {
-      bouton("🔁 Recommencer", "Écrire une autre réponse", () => {
-        if (enCours) return;
+      const refaire = bouton("🔁 Recommencer", "Écrire une autre réponse", () => {
+        // Seulement si cette réponse est encore la dernière de la conversation.
+        if (enCours || !courante || courante.messages[courante.messages.length - 1] !== msg) return;
         courante.messages.pop();
         sauver();
         afficherConversation();
         repondre();
       });
+      refaire.classList.add("recommencer");
     }
   }
 
@@ -431,6 +433,7 @@
     const texte = $("message").value.trim();
     if ((!texte && !joints.length) || enCours) return;
     voix.arreter();
+    document.querySelectorAll(".recommencer").forEach((b) => b.remove());
     if (!courante) {
       courante = { id: id(), titre: (texte || "Photo").replace(/\s+/g, " ").slice(0, 48), messages: [], maj: Date.now() };
       conversations.unshift(courante);

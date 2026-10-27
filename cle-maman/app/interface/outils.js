@@ -239,7 +239,10 @@
       const brut = (l || [])[c];
       const n = lireNombre(brut);
       if (n !== null && /\$/.test(String(brut))) argentCol[c] = true;
-      return n !== null ? n : (brut ?? "");
+      // « 00123 » est un code, pas un nombre : on garde le texte (sinon Excel
+      // enlèverait les zéros du début).
+      const code = /^\s*-?0\d/.test(String(brut ?? ""));
+      return n !== null && !code ? n : (brut ?? "");
     }));
     const aoa = [entete, ...corps];
     const ws = X.utils.aoa_to_sheet(aoa);
@@ -428,7 +431,7 @@
     // du haut et la bande du bas (pas de grand trou quand il n'y a pas de photo).
     const haut = (a.accroche ? 110 : 0) * k, bas = 230 * k;
     const cm = document.createElement("canvas");
-    cm.width = W; cm.height = H;
+    cm.width = W; cm.height = H * 2;  // assez haut pour tout dessiner avant de réduire
     const gm = cm.getContext("2d");
     const y0 = y;
 
