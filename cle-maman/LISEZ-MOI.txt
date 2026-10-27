@@ -1,0 +1,50 @@
+﻿MON ASSISTANTE — mode d'emploi
+==============================
+
+POUR COMMENCER
+  1. Branche la clé dans l'ordinateur.
+  2. Ouvre la clé dans l'Explorateur de fichiers.
+  3. Double-clique sur « Démarrer l'assistante ».
+  4. Attends que la fenêtre s'ouvre (de 20 secondes à une minute).
+  5. Écris ta demande et appuie sur Entrée.
+
+La toute première fois, si l'intelligence artificielle n'est pas encore sur
+la clé, une fenêtre propose de la télécharger : réponds « Oui » (il faut
+internet une seule fois, de 10 à 40 minutes). Ensuite, plus besoin d'internet.
+
+CE QU'ELLE SAIT FAIRE
+  - Écrire et corriger des courriels, des lettres, des avis, des rappels de paiement.
+  - Créer de vrais fichiers Word et Excel (avec les totaux calculés).
+  - Calculer les taxes (TPS et TVQ) sans erreur.
+  - Faire des affiches publicitaires avec tes photos (Facebook ou vitrine).
+  - Dessiner des schémas et des plans (étapes, organigramme, planning).
+  - Faire une petite vidéo MP4 avec tes photos.
+  - Lire une photo : facture, étiquette de batterie, document.
+  - Aider à la maison : recettes, questions de tous les jours.
+
+Astuces : clique sur 📎 pour ajouter une photo, un Word ou un Excel ; tu peux
+aussi coller une photo (Ctrl+V) ou la glisser dans la fenêtre. Sous chaque
+réponse : « Copier », « Mettre dans Word », « Mettre dans Excel ».
+A− et A+, en haut à droite, changent la grosseur du texte.
+
+OÙ SONT MES FICHIERS ?
+  Tout ce que l'assistante crée va dans le dossier « Mes documents » de la
+  clé. Ouvre-le dans l'Explorateur comme n'importe quel dossier : tu peux
+  copier-coller des fichiers entre la clé et l'ordinateur comme d'habitude.
+
+C'EST PRIVÉ
+  L'assistante fonctionne entièrement sur l'ordinateur, sans internet.
+  Rien de ce que tu écris n'est envoyé ailleurs. Personne d'autre ne le lit.
+
+  Elle peut quand même se tromper : relis avant d'envoyer un document
+  important. Les calculs, eux, sont faits par l'ordinateur.
+
+POUR FERMER
+  Ferme simplement la fenêtre : l'assistante s'arrête toute seule.
+  Avant de retirer la clé, ferme la fenêtre et attends quelques secondes.
+
+UN PROBLÈME ?
+  Ferme la fenêtre et double-clique de nouveau sur « Démarrer l'assistante ».
+  Si ça ne marche toujours pas, redémarre l'ordinateur, puis appelle Alex.
+
+Fait avec amour par Alex — Produit du Québec.

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="fr-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mon assistante</title>
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="appli">
+  <!-- ======================= colonne de gauche ======================= -->
+  <aside class="cote" id="cote">
+    <div class="marque">
+      <img src="icone.svg" alt="" class="logo">
+      <div>
+        <div class="marque-nom" id="nomAssistante">Mon assistante</div>
+        <div class="marque-sous">🔒 Tout reste dans cet ordinateur</div>
+      </div>
+    </div>
+    <button class="bouton principal plein" id="nouvelle">＋ Nouvelle conversation</button>
+    <div class="onglets" role="tablist">
+      <button class="onglet actif" data-onglet="conversations" role="tab">Conversations</button>
+      <button class="onglet" data-onglet="documents" role="tab">Mes documents</button>
+    </div>
+    <nav class="liste" id="listeConversations" aria-label="Conversations"></nav>
+    <nav class="liste cache" id="listeDocuments" aria-label="Documents créés"></nav>
+    <div class="pied-cote">
+      <div class="dossier-etat" id="dossierEtat"></div>
+      <button class="bouton fantome plein" id="ouvrirReglages">⚙️ Réglages</button>
+    </div>
+  </aside>
+
+  <!-- ========================= zone principale ========================= -->
+  <main class="principal-zone">
+    <header class="barre">
+      <button class="bouton icone seul-mobile" id="menu" aria-label="Menu">☰</button>
+      <h1 class="barre-titre" id="titreConversation">Nouvelle conversation</h1>
+      <div class="barre-actions">
+        <button class="bouton icone" id="texteMoins" title="Texte plus petit" aria-label="Texte plus petit">A−</button>
+        <button class="bouton icone" id="textePlus" title="Texte plus gros" aria-label="Texte plus gros">A+</button>
+      </div>
+    </header>
+
+    <div class="bandeau cache" id="bandeau"></div>
+
+    <section class="fil" id="fil" aria-live="polite">
+      <div class="accueil" id="accueil">
+        <img src="icone.svg" alt="" class="accueil-logo">
+        <h2 id="salutation">Bonjour !</h2>
+        <p class="accueil-sous">Contente de te voir ! Je suis là pour t'aider au bureau pis à la maison. Écris-moi comme à une collègue.</p>
+        <div class="confiance">
+          <strong>🔒 Ton assistante privée</strong>
+          <span>Elle fonctionne sans internet. Rien de ce que tu écris ne quitte cet ordinateur : personne d'autre ne peut le lire.</span>
+        </div>
+        <div class="raccourcis" id="raccourcis"></div>
+      </div>
+    </section>
+
+    <footer class="saisie-zone">
+      <div class="apercus" id="apercus"></div>
+      <div class="saisie">
+        <button class="bouton icone" id="joindre" title="Ajouter une photo ou un document" aria-label="Ajouter une photo ou un document">📎</button>
+        <textarea id="message" rows="1" placeholder="Écris ta demande ici… (Entrée pour envoyer)"></textarea>
+        <button class="bouton principal" id="envoyer" aria-label="Envoyer">Envoyer</button>
+        <button class="bouton danger cache" id="arreter" aria-label="Arrêter">Arrêter</button>
+      </div>
+      <input type="file" id="fichier" accept="image/*,.txt,.csv,.docx,.xlsx" multiple hidden>
+      <div class="note">Elle peut se tromper : relis avant d'envoyer un document important. Les calculs, eux, sont faits par l'ordinateur.</div>
+    </footer>
+  </main>
+</div>
+
+<!-- ============================== réglages ============================== -->
+<dialog id="reglages" class="dialogue">
+  <form method="dialog">
+    <h2>Réglages</h2>
+    <label>Ton prénom <input id="rPrenom" autocomplete="off"></label>
+    <label>Nom de l'assistante <input id="rNom" autocomplete="off"></label>
+    <label>Entreprise <input id="rEntreprise" autocomplete="off"></label>
+    <label>Coordonnées (pour les affiches et lettres)
+      <textarea id="rCoordonnees" rows="2" placeholder="Adresse, Dolbeau-Mistassini&#10;Téléphone"></textarea>
+    </label>
+    <label>Signature des courriels
+      <textarea id="rSignature" rows="3" placeholder="Prénom Nom&#10;Secrétaire"></textarea>
+    </label>
+    <div class="ligne-dossier">
+      <label class="case"><input type="checkbox" id="rVoixAuto"> 🔊 Lire les réponses à voix haute automatiquement</label>
+    </div>
+    <label>Vitesse de la voix
+      <select id="rVitesse">
+        <option value="0.8">Lente</option>
+        <option value="1">Normale</option>
+        <option value="1.2">Rapide</option>
+      </select>
+    </label>
+    <div class="ligne-dossier">
+      <div>
+        <strong>Dossier de travail</strong>
+        <div class="petit" id="rDossier">Aucun : les fichiers vont dans Téléchargements.</div>
+      </div>
+      <button type="button" class="bouton" id="rChoisir">Choisir…</button>
+    </div>
+    <div class="actions-dialogue">
+      <button value="annuler" class="bouton fantome">Annuler</button>
+      <button value="ok" class="bouton principal" id="rEnregistrer">Enregistrer</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="config.js"></script>
+<script src="lib/docx.js"></script>
+<script src="lib/xlsx.full.min.js"></script>
+<script src="lib/mammoth.browser.min.js"></script>
+<script src="lib/mermaid.min.js"></script>
+<script src="markdown.js"></script>
+<script src="outils.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
