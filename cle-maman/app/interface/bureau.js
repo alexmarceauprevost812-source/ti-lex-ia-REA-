@@ -196,9 +196,9 @@
           act.appendChild(this.bouton("Ouvrir", ouvrirDossier));
           act.appendChild(this.bouton("🗑️", () => agir(() => Outils.supprimerDossierVide(chemin, it.nom)), "Supprimer ce dossier (s'il est vide)"));
         } else {
-          const ouvrirFichier = async () => { const f = await Outils.fichierDuDossier(chemin, it.nom); Outils.telecharger(f, it.nom); };
+          const ouvrirFichier = async () => { const f = await Outils.fichierDuDossier(chemin, it.nom); A.ouvrirFichier(f, it.nom, Outils.etatDossier().nom === "Mes documents" ? chemin : null); };
           ligne.ondblclick = ouvrirFichier;
-          act.appendChild(this.bouton("Ouvrir", ouvrirFichier, "Ouvre une copie dans Word, Excel ou la visionneuse"));
+          act.appendChild(this.bouton("Ouvrir", ouvrirFichier, "Afficher le fichier"));
           if (/^(png|jpe?g|gif|webp|bmp|docx|xlsx|xls|txt|csv|md)$/.test(ext)) {
             act.appendChild(this.bouton("💬 À l'assistante", async () => {
               const f = await Outils.fichierDuDossier(chemin, it.nom);
@@ -431,7 +431,7 @@
     ] },
     { icone: "📄", titre: "Créer des lettres, tableaux, affiches et vidéos", vue: "assistante", etapes: [
       "Demande-le simplement : « Fais-moi une lettre Word pour… », « Fais un tableau Excel des commandes », « Fais une affiche pour la promo d'hiver », « Fais une vidéo avec mes photos ».",
-      "Le fichier est créé tout seul et rangé dans <strong>Mes documents</strong>. Le bouton <strong>Ouvrir</strong> l'ouvre dans Word, Excel ou la visionneuse.",
+      "Le fichier est créé tout seul et rangé dans <strong>Mes documents</strong>. Le bouton <strong>Ouvrir</strong> l'affiche ici ; pour le modifier dans Word ou Excel, ouvre-le depuis la clé dans l'Explorateur Windows.",
       "Les <strong>calculs et les taxes</strong> sont faits par l'ordinateur, pas par l'IA : ils sont exacts.",
     ] },
     { icone: "🧮", titre: "Calculatrice avec taxes", vue: "calcul", etapes: [

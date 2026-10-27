@@ -10,6 +10,8 @@ $racine = Split-Path -Parent $app
 $modeles = Join-Path $app 'modele'
 $port = 8765
 $url = "http://127.0.0.1:$port/"
+# La fenêtre reçoit l'emplacement de la clé, pour le bouton « Ouvrir dans Word ».
+$urlFenetre = "$url" + "?racine=" + [uri]::EscapeDataString($racine)
 $journal = Join-Path $env:TEMP 'assistante-moteur.log'
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 [System.Windows.Forms.Application]::EnableVisualStyles()
@@ -50,11 +52,11 @@ function Regler-Telechargements($profil) {
 
 function Ouvrir-Fenetre {
     $edge = Trouver-Edge
-    if (-not $edge) { Start-Process $url; return $null }
+    if (-not $edge) { Start-Process $urlFenetre; return $null }
     # Profil séparé gardé sur la clé : ses conversations et réglages la suivent.
     $profil = Join-Path $app 'profil'
     try { Regler-Telechargements $profil } catch { }
-    $arg = "--app=$url --user-data-dir=`"$profil`" --no-first-run --no-default-browser-check --disable-sync --window-size=1280,860"
+    $arg = "--app=$urlFenetre --user-data-dir=`"$profil`" --no-first-run --no-default-browser-check --disable-sync --window-size=1280,860"
     return Start-Process $edge -ArgumentList $arg -PassThru
 }
 

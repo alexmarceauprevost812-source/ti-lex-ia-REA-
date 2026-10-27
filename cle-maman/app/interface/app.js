@@ -271,6 +271,67 @@
     if (force || f.scrollHeight - f.scrollTop - f.clientHeight < 160) f.scrollTop = f.scrollHeight;
   }
 
+  // ------------------------------------------------------- visionneuse
+  // « Ouvrir » affiche le fichier ici même (Word, Excel, image, vidéo, PDF,
+  // texte) au lieu de télécharger une copie de plus. Le contenu des documents
+  // est montré dans un cadre isolé (aucun script ne peut s'y exécuter).
+  let visActuel = null;
+  // Ouvrir le VRAI fichier de la clé dans Word / Excel / PowerPoint, d'un clic.
+  // Le lanceur donne l'emplacement de la clé (?racine=E:\) ; Office comprend
+  // les liens « ms-word:ofe|u|file:///… ». Edge demande la permission la
+  // première fois (on peut cocher « Toujours autoriser »).
+  const RACINE = new URLSearchParams(location.search).get("racine");
+  const OFFICE = { docx: ["ms-word", "Word"], doc: ["ms-word", "Word"], xlsx: ["ms-excel", "Excel"], xls: ["ms-excel", "Excel"], csv: ["ms-excel", "Excel"], pptx: ["ms-powerpoint", "PowerPoint"] };
+  function lienOffice(nom, chemin) {
+    const o = OFFICE[String(nom).split(".").pop().toLowerCase()];
+    if (!o || !RACINE || chemin == null) return null;
+    const morceaux = [RACINE.replace(/[\\/]+$/, ""), "Mes documents", ...String(chemin).split(/[\\/]+/).filter(Boolean), nom];
+    const fichier = "file:///" + morceaux.map((m, i) => (i === 0 ? m : encodeURIComponent(m))).join("/");
+    return { url: `${o[0]}:ofe|u|${fichier}`, appli: o[1] };
+  }
+  function ouvrirDansOffice(nom, chemin) {
+    const l = lienOffice(nom, chemin);
+    if (!l) return false;
+    const a = document.createElement("a");
+    a.href = l.url; document.body.appendChild(a); a.click(); a.remove();
+    return true;
+  }
+  async function ouvrirFichier(blob, nom, chemin) {
+    visActuel = { blob, nom, chemin };
+    const office = lienOffice(nom, chemin);
+    $("visOffice").classList.toggle("cache", !office);
+    if (office) $("visOffice").textContent = `📝 Ouvrir dans ${office.appli}`;
+    const ext = String(nom).split(".").pop().toLowerCase();
+    const z = $("visContenu");
+    z.innerHTML = "<div class=\"vide\">Ouverture…</div>";
+    $("visTitre").textContent = nom;
+    $("visNote").textContent = "Pour modifier ce fichier, ouvre-le depuis la clé dans l'Explorateur Windows (dossier « Mes documents »), ou clique sur « Copie à modifier ».";
+    if (!$("visionneuse").open) $("visionneuse").showModal();
+    const cadre = (html) => {
+      const f = document.createElement("iframe");
+      f.setAttribute("sandbox", "");
+      f.srcdoc = `<!doctype html><meta charset="utf-8"><style>body{font:15px/1.5 Calibri,"Segoe UI",sans-serif;margin:24px;color:#222;background:#fff}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:4px 8px}img{max-width:100%}</style>${html}`;
+      return f;
+    };
+    try {
+      z.innerHTML = "";
+      if (/^(png|jpe?g|gif|webp|bmp|svg)$/.test(ext)) { const i = new Image(); i.src = URL.createObjectURL(blob); i.alt = nom; z.appendChild(i); $("visNote").textContent = ""; }
+      else if (/^(mp4|webm)$/.test(ext)) { const v = document.createElement("video"); v.controls = true; v.src = URL.createObjectURL(blob); z.appendChild(v); $("visNote").textContent = ""; }
+      else if (ext === "pdf") { const f = document.createElement("iframe"); f.src = URL.createObjectURL(blob); z.appendChild(f); }
+      else if (ext === "docx") { const r = await mammoth.convertToHtml({ arrayBuffer: await blob.arrayBuffer() }); z.appendChild(cadre(r.value || "<p>(Document vide)</p>")); }
+      else if (/^(xlsx|xls|csv)$/.test(ext)) {
+        const wb = XLSX.read(await blob.arrayBuffer(), { type: "array" });
+        z.appendChild(cadre(wb.SheetNames.map((n) => `<h3>${M.echapper(n)}</h3>` + XLSX.utils.sheet_to_html(wb.Sheets[n], { header: "", footer: "" })).join("")));
+      }
+      else if (/^(txt|md|json)$/.test(ext)) { const pre = document.createElement("pre"); pre.className = "vis-texte"; pre.textContent = await blob.text(); z.appendChild(pre); }
+      else z.innerHTML = `<div class="vide">Je ne peux pas afficher ce genre de fichier ici. Ouvre-le depuis l'Explorateur Windows, dans le dossier « Mes documents » de la clé.</div>`;
+    } catch (e) { z.innerHTML = `<div class="vide">Impossible d'afficher ce fichier : ${M.echapper(e.message || e)}</div>`; }
+  }
+  $("visFermer").onclick = () => $("visionneuse").close();
+  $("visOffice").onclick = () => { if (visActuel) ouvrirDansOffice(visActuel.nom, visActuel.chemin); };
+  $("visCopie").onclick = () => { if (visActuel) Outils.telecharger(visActuel.blob, visActuel.nom.replace(/(\.[^.]+)$/, " (copie)$1")); };
+  $("visionneuse").addEventListener("close", () => { $("visContenu").innerHTML = ""; visActuel = null; });
+
   // ------------------------------------------------------ cartes d'outils
   function carte(c) {
     const box = document.createElement("div");
@@ -283,12 +344,21 @@
     box.style.flexWrap = "wrap";
     const ou = c.mode === "dossier" ? `Enregistré dans ${c.ou}` : `Enregistré dans ${c.ou} (sur la clé)`;
     box.innerHTML = `<span class="gros">${c.icone || "📄"}</span><div class="infos"><strong>${M.echapper(c.nom)}</strong><span>${M.echapper(ou)}</span></div>`;
+    const office = lienOffice(c.nom, cheminDe(c));
+    if (office) {
+      const w = document.createElement("button");
+      w.className = "bouton petit principal";
+      w.textContent = `📝 Ouvrir dans ${office.appli}`;
+      w.title = `Ouvre le fichier de la clé dans ${office.appli}, pour le modifier`;
+      w.onclick = () => ouvrirDansOffice(c.nom, cheminDe(c));
+      box.appendChild(w);
+    }
     if (c.blob) {
       const b = document.createElement("button");
       b.className = "bouton petit";
-      b.textContent = "Ouvrir";
-      b.title = "Ouvre le fichier (dans Word, Excel ou le lecteur d'images)";
-      b.onclick = () => Outils.telecharger(c.blob, c.nom);
+      b.textContent = office ? "👀 Aperçu" : "Ouvrir";
+      b.title = "Afficher le fichier";
+      b.onclick = () => ouvrirFichier(c.blob, c.nom, cheminDe(c));
       box.appendChild(b);
     }
     if (c.svg || c.url || (c.genre === "video" && c.blob)) {
@@ -301,6 +371,13 @@
       box.appendChild(v);
     }
     return box;
+  }
+
+  // Sous-dossier (dans « Mes documents ») d'un fichier créé, si on le connaît.
+  function cheminDe(c) {
+    if (c.mode === "telechargement") return "";
+    const parts = String(c.ou || "").split(" › ");
+    return parts[0] === "Mes documents" ? parts.slice(1).join("/") : null;
   }
 
   function noterDocument(c) {
@@ -796,6 +873,7 @@
   window.Assistante = {
     ajouterFichiers,
     ecrireDoucement,
+    ouvrirFichier,
     ecrire(texte, nouvelleConv) {
       if (nouvelleConv) nouvelle();
       $("message").value = texte;
