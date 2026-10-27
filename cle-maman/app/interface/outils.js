@@ -606,6 +606,9 @@
     { type: "function", function: { name: "creer_affiche", description: "Crée une affiche publicitaire (image PNG) pour donner envie aux clients d'acheter : photo du produit, titre accrocheur, prix, points forts. Pour Facebook ou à imprimer.", parameters: { type: "object", properties: { nom_fichier: { type: "string" }, accroche: { type: "string", description: "Mot court en bandeau : PROMO, NOUVEAU, SOLDE…" }, titre: { type: "string" }, sous_titre: { type: "string" }, prix: { type: "string", description: "Ex : 149,99 $ — seulement si on te l'a donné" }, points: { type: "array", items: { type: "string" }, description: "2 à 4 points forts courts" }, appel: { type: "string", description: "Ex : Venez nous voir !" }, photo: { type: "integer", description: "Numéro d'une photo envoyée dans la conversation" }, couleur: { type: "string", enum: ["rouge", "bleu", "vert", "noir"] }, format: { type: "string", enum: ["facebook", "imprimer"] }, dossier: { type: "string" } }, required: ["titre"] } } },
     { type: "function", function: { name: "creer_video", description: "Crée une courte vidéo MP4 en diaporama (titres, textes et photos de la conversation), par exemple une promotion pour le magasin ou un souvenir.", parameters: { type: "object", properties: { nom_fichier: { type: "string" }, diapos: { type: "array", items: { type: "object", properties: { titre: { type: "string" }, texte: { type: "string" }, photo: { type: "integer", description: "Numéro d'une photo envoyée dans la conversation (1, 2…), facultatif" }, duree: { type: "number", description: "Secondes (2 à 10)" } } } }, dossier: { type: "string" } }, required: ["diapos"] } } },
     { type: "function", function: { name: "creer_dossier", description: "Crée un dossier (ou sous-dossier) dans le dossier de travail pour classer les documents.", parameters: { type: "object", properties: { nom: { type: "string" } }, required: ["nom"] } } },
+    { type: "function", function: { name: "retenir_lecon", description: "Retient une leçon dans ton mini-cerveau pour ne plus refaire la même erreur. À utiliser quand elle te corrige ou te dit que tu t'es trompée. Écris une règle courte, générale et utile pour la prochaine fois (ex. « On écrit Batteries Expert avec un s »), sans renseignement personnel délicat.", parameters: { type: "object", properties: { lecon: { type: "string" } }, required: ["lecon"] } } },
+    { type: "function", function: { name: "ajouter_rendez_vous", description: "Ajoute un rendez-vous ou un rappel dans son agenda. Calcule la date exacte à partir de la date du jour (ex. « jeudi prochain »).", parameters: { type: "object", properties: { date: { type: "string", description: "AAAA-MM-JJ" }, heure: { type: "string", description: "HH:MM sur 24 h, facultatif" }, titre: { type: "string" }, note: { type: "string" }, rappel_minutes: { type: "integer", description: "Minutes avant pour le rappel (0, 15, 30, 60). 15 par défaut." } }, required: ["date", "titre"] } } },
+    { type: "function", function: { name: "voir_agenda", description: "Lit les rendez-vous de son agenda entre deux dates (incluses).", parameters: { type: "object", properties: { du: { type: "string", description: "AAAA-MM-JJ" }, au: { type: "string", description: "AAAA-MM-JJ" } }, required: ["du"] } } },
     { type: "function", function: { name: "lister_documents", description: "Liste les fichiers et dossiers du dossier de travail.", parameters: { type: "object", properties: { dossier: { type: "string" } } } } },
   ];
 
@@ -651,6 +654,21 @@
       case "creer_dossier": {
         const t = await creerDossier(a.nom);
         return { texte: t, carte: { genre: "calcul", titre: "Dossier", detail: t } };
+      }
+      case "retenir_lecon": {
+        if (!window.Cerveau) throw new Error("Le mini-cerveau n'est pas disponible.");
+        const r = window.Cerveau.ajouter(a.lecon, "assistante");
+        return { texte: r === "deja" ? "Cette leçon était déjà dans ton mini-cerveau : elle a été rafraîchie." : "Leçon retenue dans ton mini-cerveau.", carte: { genre: "calcul", titre: "💡 Retenu dans le mini-cerveau", detail: String(a.lecon || "").trim() } };
+      }
+      case "ajouter_rendez_vous": {
+        if (!window.Agenda) throw new Error("L'agenda n'est pas disponible.");
+        const r = window.Agenda.ajouter({ date: a.date, heure: a.heure, titre: a.titre, note: a.note, rappel: a.rappel_minutes ?? 15 });
+        const d = `${window.Agenda.dateLongue(r.date)}${r.heure ? " à " + r.heure.replace(":", " h ") : ""} — ${r.titre}`;
+        return { texte: `Rendez-vous ajouté à l'agenda : ${d}.`, carte: { genre: "calcul", titre: "📅 Ajouté à l'agenda", detail: d } };
+      }
+      case "voir_agenda": {
+        if (!window.Agenda) throw new Error("L'agenda n'est pas disponible.");
+        return { texte: window.Agenda.texte(a.du, a.au), carte: null };
       }
       case "lister_documents": {
         const t = await listerDocuments(a.dossier);

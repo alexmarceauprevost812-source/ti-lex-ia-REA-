@@ -12,6 +12,8 @@ window.CONFIG_ASSISTANTE = {
   contexte: "L'entreprise appartient à son mari.",
   // Signature ajoutée au bas des courriels et lettres (une ligne par élément).
   signature: "",
+  // Sa fête (mois-jour) : animation de confettis et mot d'Alex ce jour-là.
+  fete: "11-01",
 
   // Moteur IA (ne pas changer sauf si tu sais pourquoi).
   temperature: 0.7,

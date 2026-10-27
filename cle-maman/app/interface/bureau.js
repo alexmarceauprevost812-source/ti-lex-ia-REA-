@@ -11,8 +11,10 @@
     { vue: "assistante", icone: "💬", nom: "Assistante", sous: "Jaser et travailler avec l'IA", couleur: "#0067c0" },
     { vue: "documents", icone: "📁", nom: "Mes documents", sous: "Tes fichiers sur la clé", couleur: "#c47f00" },
     { vue: "calcul", icone: "🧮", nom: "Calculatrice", sous: "Avec TPS et TVQ", couleur: "#0f7b0f" },
+    { vue: "agenda", icone: "📅", nom: "Agenda", sous: "Rendez-vous et rappels", couleur: "#c2185b" },
     { vue: "notes", icone: "📝", nom: "Bloc-notes", sous: "Notes et brouillons", couleur: "#6b3fa0" },
     { vue: "affiche", icone: "🖼️", nom: "Affiches", sous: "Publicités pour le magasin", couleur: "#b3121b" },
+    { vue: "cerveau", icone: "💡", nom: "Mini-cerveau", sous: "Ce que l'assistante a appris", couleur: "#f2a900" },
     { vue: "modeles", icone: "🧠", nom: "Modèles IA", sous: "Choisir et installer l'IA", couleur: "#00897b" },
     { vue: "guide", icone: "📖", nom: "Guide", sous: "Comment ça marche", couleur: "#00838f" },
     { vue: "corbeille", image: "img/corbeille.png", icone: "🗑️", nom: "Corbeille", sous: "Fichiers supprimés", couleur: "#4a6a8a" },
@@ -34,6 +36,8 @@
     if (vue === "calcul") setTimeout(() => $("calcEcran").focus(), 30);
     if (vue === "alex") alex.afficher();
     if (vue === "modeles") modeles.afficher();
+    if (vue === "agenda" && window.Agenda) window.Agenda.afficher();
+    if (vue === "cerveau" && window.Cerveau) { window.Cerveau.afficher(); setTimeout(() => $("cerveauNouvelle").focus(), 30); }
     $("boutonAlex").classList.toggle("actif", vue === "alex");
     if (vue === "assistante") setTimeout(() => $("message").focus(), 30);
   }
@@ -42,7 +46,9 @@
   function barreTaches() {
     const t = $("taches");
     t.querySelectorAll(".tache:not(.demarrer)").forEach((x) => x.remove());
-    for (const a of APPLIS.filter((x) => x.vue !== "reglages" && x.vue !== "corbeille")) {
+    // Toutes les applis en bas, précédées d'un bouton « Bureau » (comme Windows).
+    const tout = [{ vue: "bureau", icone: "🖥️", nom: "Bureau" }, ...APPLIS];
+    for (const a of tout) {
       const b = document.createElement("button");
       b.className = "tache"; b.dataset.vue = a.vue; b.title = a.nom; b.setAttribute("aria-label", a.nom);
       b.innerHTML = a.image ? `<img src="${a.image}" alt="">` : `<span>${a.icone}</span>`;
@@ -54,7 +60,14 @@
 
   function horloge() {
     const d = new Date();
-    $("horloge").innerHTML = `<div>${d.toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit" })}</div><div>${d.toLocaleDateString("fr-CA")}</div>`;
+    const heure = d.toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit" });
+    $("horloge").innerHTML = `<div>${heure}</div><div>${d.toLocaleDateString("fr-CA")}</div>`;
+    // La grosse horloge du bureau, à droite.
+    if ($("grosseHeure").textContent !== heure) {
+      $("grosseHeure").textContent = heure;
+      const date = d.toLocaleDateString("fr-CA", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+      $("grosseDate").textContent = date.charAt(0).toUpperCase() + date.slice(1);
+    }
   }
 
   // --------------------------------------------------------------- bureau
@@ -62,7 +75,9 @@
     const r = A.reglages();
     const h = new Date().getHours();
     const question = h >= 18 || h < 5 ? "On termine quelque chose ensemble ?" : "Prête à travailler ?";
-    A.ecrireDoucement($("bureauSalut"), (r.prenom ? `Salut ${r.prenom} ! ` : "Salut ! ") + question);
+    const fete = window.Fete && window.Fete.estFete();
+    A.ecrireDoucement($("bureauSalut"), fete ? (r.prenom ? `Bonne fête ${r.prenom} ! 🎂` : "Bonne fête ! 🎂") : (r.prenom ? `Salut ${r.prenom} ! ` : "Salut ! ") + question);
+    if (window.Agenda) window.Agenda.resumeBureau();
     const date = new Date().toLocaleDateString("fr-CA", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
     $("bureauDate").textContent = date.charAt(0).toUpperCase() + date.slice(1);
     const rec = $("bureauRecents");
@@ -461,6 +476,17 @@
       "Tu retrouves aussi ce dossier dans l'<strong>Explorateur Windows</strong> : ouvre la clé, puis « Mes documents ».",
       "Le bouton 🗑️ met un fichier à la <strong>corbeille</strong>. Dans la Corbeille, <strong>↩ Restaurer</strong> le récupère ; il n'est effacé que si tu vides la corbeille.",
     ] },
+    { icone: "💡", titre: "Mini-cerveau", vue: "cerveau", etapes: [
+      "L'assistante peut se tromper. Quand ça arrive, clique sur <strong>🧠 Corriger</strong> sous sa réponse et écris la bonne façon de faire.",
+      "Tu peux aussi simplement lui dire « Non, c'est plutôt… » : elle retient la leçon toute seule.",
+      "Elle relit ses leçons avant chaque réponse pour ne pas refaire deux fois la même erreur. Tu les vois toutes dans l'appli <strong>💡 Mini-cerveau</strong>, et tu peux en ajouter, les modifier ou les effacer.",
+    ] },
+    { icone: "📅", titre: "Agenda", vue: "agenda", etapes: [
+      "Clique sur <strong>＋ Rendez-vous</strong>, écris quoi, choisis la date et l'heure. Tu peux aussi <strong>double-cliquer</strong> sur une journée.",
+      "Choisis <strong>Me le rappeler</strong> : une petite fenêtre et un son t'avertissent 15 minutes avant (le mini-ordinateur doit être ouvert).",
+      "Les rendez-vous du jour s'affichent sur le bureau, sous « 📅 Aujourd'hui ». Les jours fériés du Québec sont déjà dans le calendrier.",
+      "Tu peux aussi demander à l'assistante : « Mets-moi un rendez-vous vendredi à 10 h avec le fournisseur ».",
+    ] },
     { icone: "⚙️", titre: "Réglages", vue: "reglages", etapes: [
       "<strong>Thème</strong> : clair, sombre, ou automatique (clair le jour, sombre le soir).",
       "Choisis ta <strong>couleur</strong> et ton <strong>fond d'écran</strong>.",
@@ -728,6 +754,8 @@
   };
   $("instAller").onclick = () => ouvrir("assistante");
   $("piluleInstallation").onclick = () => ouvrir("modeles");
+  $("bureauAgendaBloc").onclick = () => ouvrir("agenda");
+  $("bureauAgendaBloc").onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ouvrir("agenda"); } };
 
   // Icône « Mon assistante » sur le bureau Windows de l'ordinateur
   async function etatRaccourci() {
@@ -785,7 +813,7 @@
     try { localStorage.setItem("avance", JSON.stringify(v)); alert("Réglages enregistrés ✔"); } catch { alert("Enregistrement impossible."); }
   };
   $("alexDefaut").onclick = () => { try { localStorage.removeItem("avance"); } catch {} alex.afficher(); };
-  const CLES = ["conversations", "documents", "reglages", "notes", "calc-hist", "avance", "guide-vu", "verrou"];
+  const CLES = ["conversations", "documents", "reglages", "notes", "calc-hist", "avance", "guide-vu", "verrou", "agenda", "lecons"];
   $("alexExporter").onclick = () => {
     const data = { app: "mon-assistante", version: VERSION, date: new Date().toISOString(), donnees: {} };
     for (const k of CLES) { const v = localStorage.getItem(k); if (v !== null) data.donnees[k] = v; }
@@ -804,6 +832,7 @@
       location.reload();
     } catch (err) { alert(err.message); }
   };
+  $("alexFete").onclick = () => window.Fete && window.Fete.montrer();
   $("alexGuide").onclick = () => { try { localStorage.removeItem("guide-vu"); } catch {} alert("Le guide s'affichera au prochain démarrage."); };
   $("alexEffacerConv").onclick = () => {
     if (!confirm("Effacer toutes les conversations ? (Les fichiers dans Mes documents ne sont pas touchés.)")) return;
@@ -819,7 +848,7 @@
   barreTaches();
   tuiles();
   horloge();
-  setInterval(horloge, 15000);
+  setInterval(horloge, 1000);
   let dejaVu = false;
   try { dejaVu = localStorage.getItem("guide-vu") === "1"; } catch {}
   ouvrir(dejaVu ? "bureau" : "guide");

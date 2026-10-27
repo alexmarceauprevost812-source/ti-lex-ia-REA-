@@ -33,10 +33,20 @@
 <section class="vue" id="vue-bureau" aria-label="Bureau">
   <div class="bureau">
     <div class="icones-bureau" id="tuiles" role="list" aria-label="Icônes du bureau"></div>
+    <div class="colonne-droite">
+    <div class="grosse-horloge" aria-live="off">
+      <div class="grosse-heure" id="grosseHeure"></div>
+      <div class="grosse-date" id="grosseDate"></div>
+    </div>
     <aside class="widget">
       <h1 class="bureau-salut" id="bureauSalut">Salut !</h1>
-      <div class="bureau-date" id="bureauDate"></div>
+      <div class="bureau-date cache" id="bureauDate"></div>
       <div class="bureau-prive">🔒 Ton espace privé : tout reste dans cet ordinateur</div>
+      <button class="bouton plein fete-bouton cache" id="widgetFete">🎂 C'est ta fête ! Revoir ta surprise</button>
+      <div class="bureau-agenda" id="bureauAgendaBloc" role="button" tabindex="0" title="Ouvrir l'agenda">
+        <h2>📅 Aujourd'hui</h2>
+        <div id="bureauAgenda"></div>
+      </div>
       <div class="bureau-recents">
         <h2>Derniers fichiers créés</h2>
         <div id="bureauRecents" class="recents"></div>
@@ -44,6 +54,7 @@
       <button class="bouton principal plein" id="widgetAssistante">💬 Parler à l'assistante</button>
       <button class="bouton plein cache" id="widgetRaccourci">🖥️ Mettre une icône sur le bureau de l'ordinateur</button>
     </aside>
+    </div>
   </div>
 </section>
 
@@ -166,6 +177,51 @@
 </section>
 
 <!-- ============================= BLOC-NOTES ============================= -->
+<section class="vue cache" id="vue-agenda" aria-label="Agenda">
+  <div class="fenetre">
+    <header class="fenetre-barre">
+      <h1>📅 Agenda</h1>
+      <div class="agenda-nav">
+        <button class="bouton" id="agPrec" aria-label="Mois précédent">‹</button>
+        <strong id="agMois" class="agenda-titre-mois"></strong>
+        <button class="bouton" id="agSuiv" aria-label="Mois suivant">›</button>
+        <button class="bouton fantome" id="agAujourdhui">Aujourd'hui</button>
+      </div>
+      <div class="fenetre-actions">
+        <button class="bouton principal" id="agAjouter">＋ Rendez-vous</button>
+      </div>
+    </header>
+    <div class="agenda">
+      <div class="agenda-grille" id="agGrille"></div>
+      <aside class="agenda-jour">
+        <h2 id="agJourTitre"></h2>
+        <div id="agJourListe"></div>
+        <button class="bouton plein" id="agAjouterJour">＋ Ajouter à cette date</button>
+        <p class="petit">Astuce : double-clique sur une journée pour y ajouter un rendez-vous. Tu peux aussi demander à l'assistante : « Mets-moi un rendez-vous jeudi à 14 h chez le dentiste ».</p>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<section class="vue cache" id="vue-cerveau" aria-label="Mini-cerveau">
+  <div class="fenetre">
+    <header class="fenetre-barre">
+      <h1>💡 Mini-cerveau</h1>
+      <span class="petit" id="cerveauCompte"></span>
+    </header>
+    <div class="cerveau">
+      <p class="cerveau-intro">Ici, ton assistante garde ce qu'elle a appris de ses erreurs. Elle relit ces leçons <strong>avant chaque réponse</strong>, pour ne pas refaire deux fois la même erreur.</p>
+      <form class="cerveau-ajout" id="cerveauForm">
+        <input id="cerveauNouvelle" autocomplete="off" placeholder="Apprends-lui quelque chose… ex. : Le magasin ferme à 17 h le vendredi">
+        <button class="bouton principal" type="submit">＋ Retenir</button>
+      </form>
+      <div class="mdp-erreur" id="cerveauErreur" aria-live="polite"></div>
+      <div class="cerveau-liste" id="cerveauListe"></div>
+      <p class="petit">👩 = ajouté par toi · 🤖 = retenu par l'assistante quand tu l'as corrigée. Tu peux modifier ✏️ ou faire oublier 🗑️ une leçon.</p>
+    </div>
+  </div>
+</section>
+
 <section class="vue cache" id="vue-notes" aria-label="Bloc-notes">
   <div class="fenetre">
     <header class="fenetre-barre">
@@ -309,6 +365,7 @@
       <article class="alex-carte">
         <h2>🧹 Remise à zéro</h2>
         <div class="alex-boutons col">
+          <button class="bouton" id="alexFete">🎂 Voir la surprise de fête (essai, 1er novembre)</button>
           <button class="bouton" id="alexGuide">Remontrer le guide au prochain démarrage</button>
           <button class="bouton" id="alexEffacerConv">Effacer toutes les conversations</button>
           <button class="bouton danger" id="alexToutEffacer">Tout remettre à neuf</button>
@@ -466,6 +523,67 @@
   </form>
 </dialog>
 
+<!-- ========================= rendez-vous ========================= -->
+<dialog id="dialogueRdv" class="dialogue">
+  <form method="dialog" id="formRdv">
+    <h2 id="rdvTitreDialogue">📅 Nouveau rendez-vous</h2>
+    <label>Quoi ? <input id="rdvTitre" autocomplete="off" placeholder="Ex. : Commande de batteries à confirmer"></label>
+    <div class="deux-colonnes">
+      <label>Date <input type="date" id="rdvDate"></label>
+      <label>Heure (facultatif) <input type="time" id="rdvHeure"></label>
+    </div>
+    <label>Me le rappeler
+      <select id="rdvRappel">
+        <option value="-1">Pas de rappel</option>
+        <option value="0">À l'heure du rendez-vous</option>
+        <option value="15">15 minutes avant</option>
+        <option value="30">30 minutes avant</option>
+        <option value="60">1 heure avant</option>
+      </select>
+    </label>
+    <label>Note (facultatif) <textarea id="rdvNote" rows="2" placeholder="Adresse, numéro de téléphone, quoi apporter…"></textarea></label>
+    <div class="mdp-erreur" id="rdvErreur" aria-live="polite"></div>
+    <div class="actions-dialogue">
+      <button type="button" class="bouton danger cache" id="rdvSupprimer">Supprimer</button>
+      <button value="annuler" class="bouton fantome">Annuler</button>
+      <button type="submit" value="ok" class="bouton principal">Enregistrer</button>
+    </div>
+  </form>
+</dialog>
+<div class="toasts" id="toasts" aria-live="assertive"></div>
+
+<!-- ========================= corriger une réponse ========================= -->
+<dialog id="dialogueLecon" class="dialogue">
+  <form method="dialog" id="formLecon">
+    <h2>🧠 Corriger l'assistante</h2>
+    <p class="petit">Écris ce qui n'allait pas et la bonne façon de faire. Elle s'en souviendra pour la prochaine fois.</p>
+    <label>Ce qu'elle doit retenir
+      <textarea id="leconTexte" rows="3" placeholder="Ex. : On écrit « Batteries Expert » avec un s. / Les prix sont toujours avant taxes."></textarea>
+    </label>
+    <label class="case"><input type="checkbox" id="leconRefaire" checked> Lui demander de refaire sa réponse tout de suite</label>
+    <div class="mdp-erreur" id="leconErreur" aria-live="polite"></div>
+    <div class="actions-dialogue">
+      <button value="annuler" class="bouton fantome">Annuler</button>
+      <button type="submit" value="ok" class="bouton principal">Retenir</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ====================== surprise de fête (1er novembre) ====================== -->
+<div class="fete cache" id="fete" role="dialog" aria-modal="true" aria-label="Bonne fête" aria-hidden="true">
+  <canvas class="fete-confettis" id="feteConfettis"></canvas>
+  <div class="fete-carte">
+    <div class="fete-gateau" aria-hidden="true">🎂</div>
+    <h1 class="fete-titre" id="feteTitre">Bonne fête !</h1>
+    <p class="fete-de" id="feteDe">De la part de ton garçon, Alex Marceau Prevost 👀</p>
+    <p class="fete-souhait" id="feteSouhait">Bonne journée ! 💙</p>
+    <div class="fete-actions">
+      <button class="bouton" id="feteEcouter">🔊 Écouter</button>
+      <button class="bouton principal" id="feteMerci">Merci ! 💙</button>
+    </div>
+  </div>
+</div>
+
 <script src="config.js"></script>
 <script src="lib/docx.js"></script>
 <script src="lib/xlsx.full.min.js"></script>
@@ -474,6 +592,9 @@
 <script src="markdown.js"></script>
 <script src="outils.js"></script>
 <script src="app.js"></script>
+<script src="cerveau.js"></script>
+<script src="agenda.js"></script>
+<script src="fete.js"></script>
 <script src="bureau.js"></script>
 <script src="verrou.js"></script>
 </body>

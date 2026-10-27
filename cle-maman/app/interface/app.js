@@ -68,9 +68,17 @@
       "- dessiner_schema pour un plan, des étapes, un organigramme ou un planning.",
       "- creer_video pour une petite vidéo diaporama avec les photos.",
       "- creer_dossier et lister_documents pour classer ses fichiers.",
+      "- ajouter_rendez_vous et voir_agenda pour son agenda (rendez-vous, rappels, livraisons, paiements à faire).",
+      "- retenir_lecon quand elle te corrige ou te dit que tu t'es trompée : excuse-toi en une phrase, corrige-toi, et retiens une règle courte pour ne JAMAIS refaire cette erreur.",
       "Après avoir utilisé un outil, dis en une phrase ce qui a été fait et où trouver le fichier.",
       "Les photos envoyées sont numérotées (photo 1, photo 2…) dans l'ordre de la conversation.",
     ];
+    const lecons = window.Cerveau ? window.Cerveau.pourConsigne() : [];
+    if (lecons.length) lignes.push("", "Ton mini-cerveau — leçons apprises de tes erreurs passées. Respecte-les TOUJOURS, ne refais jamais ces erreurs :", ...lecons);
+    const maintenant = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    lignes.push("", `Aujourd'hui : ${maintenant.toLocaleDateString("fr-CA", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} (${maintenant.getFullYear()}-${pad(maintenant.getMonth() + 1)}-${pad(maintenant.getDate())}), il est ${pad(maintenant.getHours())} h ${pad(maintenant.getMinutes())}.`);
+    if (window.Fete && window.Fete.estFete()) lignes.push(`C'est la FÊTE de ${reglages.prenom || "la personne qui t'écrit"} aujourd'hui ! Souhaite-lui bonne fête chaleureusement dans ta première réponse de la conversation.`);
     if (reglages.signature) lignes.push("", "Signature à mettre au bas des courriels et lettres :", reglages.signature);
     if (reglages.coordonnees) lignes.push("", "Coordonnées de l'entreprise (pour les affiches et lettres) :", reglages.coordonnees);
     const plus = avance().instructions.trim();
@@ -477,7 +485,17 @@
         zone.parentElement.querySelector(".cartes").appendChild(carte({ genre: "fichier", icone: "📊", ...f }));
       });
     }
-    if (courante && courante.messages[courante.messages.length - 1] === msg) {
+    const derniere = courante && courante.messages[courante.messages.length - 1] === msg;
+    if (window.Cerveau) bouton("🧠 Corriger", "Elle s'est trompée ? Dis-lui quoi retenir pour la prochaine fois", () => {
+      window.Cerveau.corriger(derniere && !enCours, (lecon) => {
+        if (enCours) return;
+        if (window.ouvrirAppli) window.ouvrirAppli("assistante");
+        $("message").value = `Petite correction : ${lecon}\nPeux-tu refaire ta réponse en tenant compte de ça ?`;
+        ajusterSaisie();
+        $("envoyer").click();
+      });
+    });
+    if (derniere) {
       const refaire = bouton("🔁 Recommencer", "Écrire une autre réponse", () => {
         // Seulement si cette réponse est encore la dernière de la conversation.
         if (enCours || !courante || courante.messages[courante.messages.length - 1] !== msg) return;

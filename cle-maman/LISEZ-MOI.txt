@@ -23,9 +23,21 @@ LA TOUTE PREMIÈRE FOIS
 
 TON MINI-ORDINATEUR
   Bureau avec icônes, menu Démarrer et barre des tâches, comme Windows.
-  Applis : Assistante, Mes documents, Calculatrice (TPS/TVQ), Bloc-notes,
-  Affiches, Modèles IA, Guide, Corbeille, Réglages (thème clair/sombre/automatique,
-  couleur, fond d'écran, voix).
+  Grosse horloge à droite, et toutes les applis en bas dans la barre des tâches.
+  Applis : Assistante, Mes documents, Calculatrice (TPS/TVQ), Agenda, Bloc-notes,
+  Affiches, Mini-cerveau, Modèles IA, Guide, Corbeille, Réglages (thème
+  clair/sombre/automatique, couleur, fond d'écran, voix, mot de passe).
+
+AGENDA
+  Clique sur « ＋ Rendez-vous » (ou double-clique sur une journée). Choisis
+  « Me le rappeler » : une petite fenêtre et un son t'avertissent avant.
+  Les rendez-vous du jour s'affichent sur le bureau. Les jours fériés du Québec
+  sont déjà là. Tu peux aussi le demander à l'assistante.
+
+MINI-CERVEAU
+  Quand l'assistante se trompe, clique sur « 🧠 Corriger » sous sa réponse (ou
+  dis-lui « Non, c'est plutôt… »). Elle retient la leçon et la relit avant
+  chaque réponse, pour ne pas refaire deux fois la même erreur.
 
 CE QUE L'ASSISTANTE SAIT FAIRE
   - Écrire et corriger des courriels, des lettres, des avis, des rappels de paiement.
