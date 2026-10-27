@@ -20,7 +20,18 @@ $gpuExe = Join-Path $app 'moteur\gpu\llama-server.exe'
 $port = 8765
 $url = "http://127.0.0.1:$port/"
 # La fenêtre reçoit l'emplacement de la clé, pour le bouton « Ouvrir dans Word ».
-$urlFenetre = "$url" + "?racine=" + [uri]::EscapeDataString($racine)
+# Un petit fichier caché « .cle-michelle » (un numéro unique) dans « Mes
+# documents » permet à la fenêtre de vérifier qu'un dossier choisi est bien
+# celui de CETTE clé avant d'ouvrir un fichier directement dans Word.
+$docsCle = Join-Path $racine 'Mes documents'
+New-Item -ItemType Directory -Force $docsCle | Out-Null
+$marqueur = Join-Path $docsCle '.cle-michelle'
+if (-not (Test-Path $marqueur)) {
+    [System.IO.File]::WriteAllText($marqueur, [guid]::NewGuid().ToString('N'), (New-Object System.Text.UTF8Encoding($false)))
+    try { (Get-Item $marqueur -Force).Attributes = 'Hidden' } catch {}
+}
+$idCle = ([System.IO.File]::ReadAllText($marqueur)).Trim()
+$urlFenetre = "$url" + "?racine=" + [uri]::EscapeDataString($racine) + "&cle=" + $idCle
 $journal = Join-Path $env:TEMP 'assistante-moteur.log'
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 [System.Windows.Forms.Application]::EnableVisualStyles()

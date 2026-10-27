@@ -198,7 +198,7 @@
           act.appendChild(this.bouton("Ouvrir", ouvrirDossier));
           act.appendChild(this.bouton("🗑️", () => agir(() => Outils.supprimerDossierVide(chemin, it.nom)), "Supprimer ce dossier (s'il est vide)"));
         } else {
-          const ouvrirFichier = async () => { const f = await Outils.fichierDuDossier(chemin, it.nom); A.ouvrirFichier(f, it.nom, Outils.etatDossier().nom === "Mes documents" ? chemin : null); };
+          const ouvrirFichier = async () => { const f = await Outils.fichierDuDossier(chemin, it.nom); A.ouvrirFichier(f, it.nom, Outils.etatDossier().estCle ? chemin : null); };
           ligne.ondblclick = ouvrirFichier;
           act.appendChild(this.bouton("Ouvrir", ouvrirFichier, "Afficher le fichier"));
           if (/^(png|jpe?g|gif|webp|bmp|docx|xlsx|xls|txt|csv|md)$/.test(ext)) {

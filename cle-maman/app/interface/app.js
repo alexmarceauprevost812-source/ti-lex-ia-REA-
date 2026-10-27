@@ -376,6 +376,8 @@
   // Sous-dossier (dans « Mes documents ») d'un fichier créé, si on le connaît.
   function cheminDe(c) {
     if (c.mode === "telechargement") return "";
+    // Dossier choisi dans Réglages : seulement si c'est vérifié comme celui de la clé.
+    if (!Outils.etatDossier().estCle) return null;
     const parts = String(c.ou || "").split(" › ");
     return parts[0] === "Mes documents" ? parts.slice(1).join("/") : null;
   }

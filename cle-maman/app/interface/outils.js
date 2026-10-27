@@ -99,12 +99,23 @@
 
   let dossier = null;           // FileSystemDirectoryHandle
   let dossierPret = false;      // permission accordée pour cette session
+  let dossierEstCle = false;    // c'est bien « Mes documents » de CETTE clé
+  const ID_CLE = new URLSearchParams(location.search).get("cle");
+  async function verifierCle() {
+    dossierEstCle = false;
+    if (!dossier || !dossierPret || !ID_CLE) return;
+    try {
+      const f = await (await dossier.getFileHandle(".cle-michelle")).getFile();
+      dossierEstCle = (await f.text()).trim() === ID_CLE;
+    } catch { dossierEstCle = false; }
+  }
 
   async function chargerDossier() {
     try {
       dossier = await bdLire("travail");
       if (dossier) dossierPret = (await dossier.queryPermission({ mode: "readwrite" })) === "granted";
     } catch { dossier = null; dossierPret = false; }
+    await verifierCle();
     return etatDossier();
   }
   async function choisirDossier() {
@@ -112,14 +123,16 @@
     dossier = await window.showDirectoryPicker({ id: "travail", mode: "readwrite", startIn: "documents" });
     dossierPret = true;
     await bdEcrire("travail", dossier);
+    await verifierCle();
     return etatDossier();
   }
   async function reconnecterDossier() {
     if (!dossier) return etatDossier();
     dossierPret = (await dossier.requestPermission({ mode: "readwrite" })) === "granted";
+    await verifierCle();
     return etatDossier();
   }
-  const etatDossier = () => ({ nom: dossier ? dossier.name : null, pret: dossierPret });
+  const etatDossier = () => ({ nom: dossier ? dossier.name : null, pret: dossierPret, estCle: dossierEstCle });
 
   const nomPropre = (n, ext) => {
     let base = String(n || "document").replace(/\.[a-z0-9]{2,4}$/i, "").replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim().slice(0, 80) || "document";
@@ -201,6 +214,7 @@
     const d = await sousDossier(chemin, false);
     const out = [];
     for await (const [nom, h] of d.entries()) {
+      if (nom.startsWith(".")) continue;   // fichiers techniques cachés
       if (h.kind === "directory") out.push({ nom, dossier: true });
       else {
         try { const f = await h.getFile(); out.push({ nom, dossier: false, taille: f.size, date: f.lastModified }); }
