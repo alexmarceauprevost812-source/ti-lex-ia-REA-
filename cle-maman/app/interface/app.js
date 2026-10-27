@@ -26,13 +26,18 @@
   let enCours = null;       // AbortController de la réponse en cours
 
   function sauver() {
-    // Si la mémoire de la fenêtre est pleine, on retire les photos des plus
-    // vieilles conversations (le texte, lui, est gardé).
-    for (let essai = 0; essai < 30; essai++) {
-      if (stock.ecrire("conversations", conversations)) return;
-      const vieille = [...conversations].reverse().find((c) => c.messages.some((m) => m.images && m.images.length));
-      if (!vieille) break;
-      vieille.messages.forEach((m) => { if (m.images && m.images.length) { m.texte = (m.texte || "") + `\n[${m.images.length} photo(s) retirée(s) pour faire de la place]`; m.images = []; } });
+    if (stock.ecrire("conversations", conversations)) return;
+    // La mémoire de la fenêtre est pleine : on retire les photos des plus
+    // vieilles conversations, mais SEULEMENT dans la copie enregistrée — la
+    // conversation en cours garde ses photos (la réponse en a besoin).
+    // Celle qui est affichée passe en dernier.
+    const copie = JSON.parse(JSON.stringify(conversations));
+    const ordre = copie.map((c, i) => ({ c, vraie: conversations[i] })).reverse()
+      .sort((x, y) => (x.vraie === courante) - (y.vraie === courante));
+    for (const { c } of ordre) {
+      if (!c.messages.some((m) => m.images && m.images.length)) continue;
+      c.messages.forEach((m) => { if (m.images && m.images.length) { m.texte = (m.texte || "") + `\n[${m.images.length} photo(s) retirée(s) pour faire de la place]`; m.images = []; } });
+      if (stock.ecrire("conversations", copie)) return;
     }
   }
   const sauverDocs = () => stock.ecrire("documents", documents.slice(0, 200));
