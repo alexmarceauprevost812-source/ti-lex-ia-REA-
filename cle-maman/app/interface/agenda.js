@@ -13,7 +13,8 @@
   const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const deIso = (s) => { const [a, m, j] = s.split("-").map(Number); return new Date(a, m - 1, j); };
   const aujourdhui = () => iso(new Date());
-  const valideDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s || "") && !isNaN(deIso(s));
+  // La date doit exister vraiment (pas de 30 février) : elle doit revenir identique.
+  const valideDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s || "") && iso(deIso(s)) === s;
   const valideHeure = (s) => /^([01]\d|2[0-3]):[0-5]\d$/.test(s || "");
   const heureFr = (h) => (h ? h.replace(":", " h ") : "");
   const dateLongue = (s) => { const t = deIso(s).toLocaleDateString("fr-CA", { weekday: "long", day: "numeric", month: "long", year: "numeric" }); return t.charAt(0).toUpperCase() + t.slice(1); };

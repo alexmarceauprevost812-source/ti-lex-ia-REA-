@@ -416,6 +416,7 @@
     },
     lire(texte, bouton) {
       if (!("speechSynthesis" in window)) return;
+      if (document.documentElement.classList.contains("verrouille")) return; // écran verrouillé : silence
       const etaitCeluiLa = this.bouton === bouton;
       this.arreter();
       if (etaitCeluiLa) return;
@@ -777,7 +778,8 @@
     // Les boutons utilisent la version affichée (avec le fichier pour « Ouvrir »).
     if (msg.texte) {
       ajouterActions(vue.actions, aGarder);
-      if (reglages.voixAuto && vue.actions._ecouter) voix.lire(aGarder.texte, vue.actions._ecouter);
+      // Jamais de lecture à voix haute quand l'écran est verrouillé.
+      if (reglages.voixAuto && vue.actions._ecouter && !document.documentElement.classList.contains("verrouille")) voix.lire(aGarder.texte, vue.actions._ecouter);
     }
     if (courante === conv) {
       // Elle est revenue dans cette conversation pendant que la réponse
