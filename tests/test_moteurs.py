@@ -114,6 +114,35 @@ def test_draw_diagram_refuse_un_lien_vers_l_exterieur(config, tmp_path):
     assert dehors.read_text(encoding="utf-8") == "intact"
 
 
+def test_draw_diagram_refuse_une_base_en_lien(config, tmp_path):
+    """schemas/plan -> autre/actual, et autre/actual.mmd -> fichier extérieur."""
+    dehors = tmp_path / "dehors.txt"
+    dehors.write_text("intact", encoding="utf-8")
+    autre = config.workspace / "autre"
+    autre.mkdir(parents=True)
+    dossier = config.workspace / "schemas"
+    dossier.mkdir()
+    try:
+        (autre / "actual.mmd").symlink_to(dehors)
+        (dossier / "plan").symlink_to(autre / "actual")
+    except OSError:
+        pytest.skip("liens symboliques non disponibles")
+    toolbox(config).call("draw_diagram", {"code": "flowchart TD\n A-->B", "name": "plan"})
+    assert dehors.read_text(encoding="utf-8") == "intact"
+
+
+def test_draw_diagram_refuse_un_dossier_schemas_en_lien(config, tmp_path):
+    dehors = tmp_path / "dehors"
+    dehors.mkdir()
+    config.workspace.mkdir(parents=True, exist_ok=True)
+    try:
+        (config.workspace / "schemas").symlink_to(dehors, target_is_directory=True)
+    except OSError:
+        pytest.skip("liens symboliques non disponibles")
+    out = toolbox(config).call("draw_diagram", {"code": "flowchart TD\n A-->B", "name": "x"})
+    assert "en dehors" in out and not any(dehors.iterdir())
+
+
 def test_draw_diagram_erreur_lisible(config):
     assert "n'est pas un type" in toolbox(config).call("draw_diagram", {"code": "salut"})
 

@@ -264,10 +264,12 @@ class Toolbox:
         from .schema import SchemaError, dessiner, nom_sur
 
         nom = nom_sur(name)
-        base = self._resolve(f"schemas/{nom}")
-        # Chaque fichier écrit est vérifié séparément : un lien symbolique
-        # schemas/x.mmd vers l'extérieur serait sinon suivi à l'écriture.
-        sorties = [self._resolve(f"schemas/{nom}{ext}") for ext in (".mmd", ".html", ".png")]
+        # On NE résout PAS la base : dessiner() écrit base.with_suffix(...), et
+        # ce sont exactement ces chemins-là qu'on vérifie un par un (un lien
+        # symbolique sur le dossier ou sur un fichier vers l'extérieur est refusé).
+        base = self.config.workspace.resolve() / "schemas" / nom
+        sorties = [self._resolve(str(base.with_suffix(ext).relative_to(self.config.workspace.resolve())))
+                   for ext in (".mmd", ".html", ".png")]
         existants = [p for p in sorties if p.exists()]
         if existants and not self.confirm(
                 f"Remplacer le schéma existant « schemas/{nom} » "
