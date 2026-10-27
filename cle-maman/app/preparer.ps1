@@ -110,11 +110,29 @@ foreach ($t in $ordre) {
 }
 if (-not $fait) { throw "Aucun modèle n'a pu être téléchargé." }
 
+# Raccourci « Mon assistante » avec le logo, à la racine de la clé, et clé
+# reconnaissable dans « Ce PC » (autorun.inf : icône + nom, sans rien lancer).
+function Mettre-A-Jour-Raccourci($racine, $app) {
+    try {
+        $sh = New-Object -ComObject WScript.Shell
+        $lnk = $sh.CreateShortcut((Join-Path $racine 'Mon assistante.lnk'))
+        $lnk.TargetPath = Join-Path $racine "Démarrer l'assistante.cmd"
+        $lnk.WorkingDirectory = $racine
+        $lnk.IconLocation = (Join-Path $app 'interface\icone.ico') + ',0'
+        $lnk.WindowStyle = 7
+        $lnk.Description = 'Ouvrir mon assistante'
+        $lnk.Save()
+        $inf = Join-Path $racine 'autorun.inf'
+        if (Test-Path $inf) { (Get-Item $inf -Force).Attributes = 'Hidden' }
+    } catch { }
+}
+
 # Clé bien rangée pour elle : on voit seulement « Démarrer l'assistante »,
 # « Mes documents » et le mode d'emploi. Le dossier technique est caché.
 $racine = Split-Path -Parent $app
 New-Item -ItemType Directory -Force (Join-Path $racine 'Mes documents') | Out-Null
 try { (Get-Item $app -Force).Attributes = 'Directory, Hidden' } catch {}
+Mettre-A-Jour-Raccourci $racine $app
 
 Titre "Terminé !"
 Write-Host "   L'assistante est prête. Double-clique sur « Démarrer l'assistante »." -ForegroundColor Green

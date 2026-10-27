@@ -58,7 +58,25 @@ function Ouvrir-Fenetre {
     return Start-Process $edge -ArgumentList $arg -PassThru
 }
 
+# Raccourci « Mon assistante » avec le logo, à la racine de la clé, et clé
+# reconnaissable dans « Ce PC » (autorun.inf : icône + nom, sans rien lancer).
+function Mettre-A-Jour-Raccourci($racine, $app) {
+    try {
+        $sh = New-Object -ComObject WScript.Shell
+        $lnk = $sh.CreateShortcut((Join-Path $racine 'Mon assistante.lnk'))
+        $lnk.TargetPath = Join-Path $racine "Démarrer l'assistante.cmd"
+        $lnk.WorkingDirectory = $racine
+        $lnk.IconLocation = (Join-Path $app 'interface\icone.ico') + ',0'
+        $lnk.WindowStyle = 7
+        $lnk.Description = 'Ouvrir mon assistante'
+        $lnk.Save()
+        $inf = Join-Path $racine 'autorun.inf'
+        if (Test-Path $inf) { (Get-Item $inf -Force).Attributes = 'Hidden' }
+    } catch { }
+}
+
 # Déjà démarrée (double-clic une 2e fois) : on rouvre juste la fenêtre.
+Mettre-A-Jour-Raccourci $racine $app
 if (Pret) { Ouvrir-Fenetre | Out-Null; exit 0 }
 
 # --------------------------------------------- IA pas encore téléchargée

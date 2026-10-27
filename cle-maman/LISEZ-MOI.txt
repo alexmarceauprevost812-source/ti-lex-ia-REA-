@@ -3,16 +3,24 @@
 
 POUR COMMENCER
   1. Branche la clé dans l'ordinateur.
-  2. Ouvre la clé dans l'Explorateur de fichiers.
-  3. Double-clique sur « Démarrer l'assistante ».
+  2. Ouvre la clé dans l'Explorateur de fichiers (elle s'appelle
+     « Assistante de Michelle », avec le logo bleu).
+  3. Double-clique sur « Mon assistante » (ou « Démarrer l'assistante »).
   4. Attends que la fenêtre s'ouvre (de 20 secondes à une minute).
-  5. Écris ta demande et appuie sur Entrée.
+  5. Ton bureau apparaît, comme sur un ordinateur : clique sur une icône.
+     Le Guide 📖 explique tout, étape par étape.
 
 La toute première fois, si l'intelligence artificielle n'est pas encore sur
 la clé, une fenêtre propose de la télécharger : réponds « Oui » (il faut
 internet une seule fois, de 10 à 40 minutes). Ensuite, plus besoin d'internet.
 
-CE QU'ELLE SAIT FAIRE
+TON MINI-ORDINATEUR
+  Bureau avec icônes, menu Démarrer et barre des tâches, comme Windows.
+  Applis : Assistante, Mes documents, Calculatrice (TPS/TVQ), Bloc-notes,
+  Affiches, Guide, Corbeille, Réglages (thème clair/sombre/automatique,
+  couleur, fond d'écran, voix).
+
+CE QUE L'ASSISTANTE SAIT FAIRE
   - Écrire et corriger des courriels, des lettres, des avis, des rappels de paiement.
   - Créer de vrais fichiers Word et Excel (avec les totaux calculés).
   - Calculer les taxes (TPS et TVQ) sans erreur.

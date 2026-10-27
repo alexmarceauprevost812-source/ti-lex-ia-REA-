@@ -183,6 +183,65 @@
     return noms.length ? noms.slice(0, 200).join("\n") : "(dossier vide)";
   }
 
+  // Pour l'appli « Mes documents » : contenu d'un dossier, lecture, copie.
+  function verifierDossier() {
+    if (!dossier || !dossierPret) throw new Error("Le dossier « Mes documents » n'est pas branché.");
+  }
+  async function entrees(chemin) {
+    verifierDossier();
+    const d = await sousDossier(chemin, false);
+    const out = [];
+    for await (const [nom, h] of d.entries()) {
+      if (h.kind === "directory") out.push({ nom, dossier: true });
+      else {
+        try { const f = await h.getFile(); out.push({ nom, dossier: false, taille: f.size, date: f.lastModified }); }
+        catch { out.push({ nom, dossier: false }); }
+      }
+    }
+    return out.sort((a, b) => (b.dossier - a.dossier) || a.nom.localeCompare(b.nom, "fr"));
+  }
+  async function fichierDuDossier(chemin, nom) {
+    verifierDossier();
+    const d = await sousDossier(chemin, false);
+    return (await d.getFileHandle(nom)).getFile();
+  }
+  // Copie des fichiers de l'ordinateur vers le dossier (sans rien écraser).
+  async function copierDans(chemin, fichiers) {
+    verifierDossier();
+    const noms = [];
+    for (const f of fichiers) {
+      const r = await enregistrer(f, f.name, chemin);
+      noms.push(r.nom);
+    }
+    return noms;
+  }
+
+  // Corbeille : « supprimer » déplace le fichier dans Mes documents › Corbeille.
+  // Il n'est effacé pour de bon que quand on vide la corbeille.
+  const CORBEILLE = "Corbeille";
+  async function deplacer(src, nom, dst) {
+    const f = await fichierDuDossier(src, nom);
+    const r = await enregistrer(f, nom, dst);
+    if (r.mode !== "dossier") throw new Error("Déplacement impossible.");
+    await (await sousDossier(src, false)).removeEntry(nom);
+    return r.nom;
+  }
+  const mettreALaCorbeille = (chemin, nom) => deplacer(chemin, nom, CORBEILLE);
+  const restaurer = (nom) => deplacer(CORBEILLE, nom, "");
+  async function supprimerDossierVide(chemin, nom) {
+    verifierDossier();
+    try { await (await sousDossier(chemin, false)).removeEntry(nom); }
+    catch { throw new Error("Ce dossier n'est pas vide : déplace ou supprime d'abord ce qu'il contient."); }
+  }
+  async function viderCorbeille() {
+    verifierDossier();
+    const d = await sousDossier(CORBEILLE, true);
+    const noms = [];
+    for await (const [nom] of d.entries()) noms.push(nom);
+    for (const nom of noms) await d.removeEntry(nom, { recursive: true });
+    return noms.length;
+  }
+
   // ------------------------------------------------------------- Word
   function docxDepuisMarkdown(titre, texte) {
     const D = window.docx;
@@ -564,5 +623,7 @@
     docxDepuisMarkdown, xlsxDepuisTableau, dessinerSchema, svgEnPng, creerVideo, creerAffiche,
     enregistrer, telecharger, nomPropre,
     chargerDossier, choisirDossier, reconnecterDossier, etatDossier,
+    entrees, fichierDuDossier, copierDans, creerDossier,
+    CORBEILLE, mettreALaCorbeille, restaurer, viderCorbeille, supprimerDossierVide,
   };
 })();

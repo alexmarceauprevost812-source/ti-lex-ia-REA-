@@ -16,7 +16,9 @@
     },
   };
 
-  let reglages = Object.assign({ prenom: CFG.prenom || "", nomAssistante: CFG.nomAssistante || "Mon assistante", entreprise: CFG.entreprise || "", signature: CFG.signature || "", coordonnees: "", taille: 17, voixAuto: false, vitesseVoix: 1 }, stock.lire("reglages", {}));
+  // Réglages techniques choisis dans l'Espace Alex (sinon ceux de config.js).
+  const avance = () => Object.assign({ temperature: CFG.temperature ?? 0.7, maxTokens: CFG.maxTokens || 1500, messagesGardes: CFG.messagesGardes || 12, instructions: "" }, stock.lire("avance", {}));
+  let reglages = Object.assign({ prenom: CFG.prenom || "", nomAssistante: CFG.nomAssistante || "Mon assistante", entreprise: CFG.entreprise || "", signature: CFG.signature || "", coordonnees: "", taille: 17, voixAuto: false, vitesseVoix: 1, theme: "auto", accent: "bleu", fond: "lac" }, stock.lire("reglages", {}));
   let conversations = stock.lire("conversations", []);
   let documents = stock.lire("documents", []);
   let courante = null;      // conversation affichée
@@ -71,6 +73,8 @@
     ];
     if (reglages.signature) lignes.push("", "Signature à mettre au bas des courriels et lettres :", reglages.signature);
     if (reglages.coordonnees) lignes.push("", "Coordonnées de l'entreprise (pour les affiches et lettres) :", reglages.coordonnees);
+    const plus = avance().instructions.trim();
+    if (plus) lignes.push("", "Consignes particulières (à respecter) :", plus);
     return lignes.join("\n");
   }
 
@@ -112,7 +116,41 @@
   }
 
   // ------------------------------------------------------------ affichage
+  // Thème : clair, sombre, comme Windows, ou automatique selon l'heure
+  // (sombre de 19 h à 7 h). Couleur d'accent et fond d'écran au choix.
+  const ACCENTS = { bleu: "#0067c0", vert: "#0f7b0f", violet: "#6b3fa0", rouge: "#c42b1c", orange: "#c45f00", rose: "#c2185b" };
+  const FONDS = { lac: "Lac", aurore: "Aurore", coucher: "Coucher de soleil", foret: "Forêt", neige: "Neige", uni: "Uni" };
+  function appliquerTheme() {
+    const h = new Date().getHours();
+    const t = reglages.theme === "auto" ? (h >= 19 || h < 7 ? "sombre" : "clair") : reglages.theme;
+    document.documentElement.dataset.theme = t;
+    document.documentElement.dataset.accent = reglages.accent;
+    document.documentElement.dataset.fond = reglages.fond;
+  }
+  setInterval(appliquerTheme, 60000);
+
+  function pastilles() {
+    const ac = $("rAccents"); ac.innerHTML = "<span class=\"petit\">Couleur</span>";
+    for (const [nom, couleur] of Object.entries(ACCENTS)) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "pastille" + (reglages.accent === nom ? " choisie" : "");
+      b.style.background = couleur; b.title = nom; b.setAttribute("aria-label", "Couleur " + nom);
+      b.onclick = () => { reglages.accent = nom; appliquerTheme(); pastilles(); };
+      ac.appendChild(b);
+    }
+    const fo = $("rFonds"); fo.innerHTML = "<span class=\"petit\">Fond d'écran</span>";
+    for (const [nom, titre] of Object.entries(FONDS)) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "vignette fond-" + nom + (reglages.fond === nom ? " choisie" : "");
+      b.title = titre; b.setAttribute("aria-label", "Fond " + titre);
+      b.innerHTML = `<span>${titre}</span>`;
+      b.onclick = () => { reglages.fond = nom; appliquerTheme(); pastilles(); };
+      fo.appendChild(b);
+    }
+  }
+
   function appliquerReglages() {
+    appliquerTheme();
     document.documentElement.style.setProperty("--taille", reglages.taille + "px");
     $("nomAssistante").textContent = reglages.nomAssistante || "Mon assistante";
     document.title = reglages.nomAssistante || "Mon assistante";
@@ -122,18 +160,17 @@
   }
 
   // Le message d'accueil s'écrit tout seul, lettre par lettre, comme à la main.
-  let ecritureEnCours = 0;
   function ecrireDoucement(el, texte) {
     if (el.dataset.texte === texte) return;
     el.dataset.texte = texte;
     el.setAttribute("aria-label", texte);
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) { el.textContent = texte; return; }
-    const tour = ++ecritureEnCours;
+    const tour = (el._tour = (el._tour || 0) + 1);  // une animation par élément
     el.textContent = "";
     el.classList.add("curseur");
     let i = 0;
     const suivant = () => {
-      if (tour !== ecritureEnCours) return;
+      if (tour !== el._tour) return;
       el.textContent = texte.slice(0, ++i);
       if (i < texte.length) setTimeout(suivant, /[ !?,]/.test(texte[i - 1]) ? 110 : 45);
       else setTimeout(() => el.classList.remove("curseur"), 1200);
@@ -484,7 +521,7 @@
   // Messages envoyés au moteur : consigne + derniers échanges. Les photos ne
   // sont renvoyées que pour les 4 derniers messages (plus rapide).
   function pourLeModele() {
-    const garde = courante.messages.slice(-(CFG.messagesGardes || 12));
+    const garde = courante.messages.slice(-avance().messagesGardes);
     const n = garde.length;
     let compteur = photosDe(courante).length - garde.reduce((s, m) => s + (m.images || []).length, 0);
     const out = [{ role: "system", content: consigne() }];
@@ -513,8 +550,8 @@
       signal,
       body: JSON.stringify({
         messages, stream: true, tools: Outils.SCHEMAS,
-        temperature: CFG.temperature ?? 0.7, top_p: 0.8, top_k: 20, repeat_penalty: 1.05,
-        max_tokens: CFG.maxTokens || 1500,
+        temperature: avance().temperature, top_p: 0.8, top_k: 20, repeat_penalty: 1.05,
+        max_tokens: avance().maxTokens,
       }),
     });
     if (!r.ok) {
@@ -721,6 +758,9 @@
     $("rPrenom").value = reglages.prenom; $("rNom").value = reglages.nomAssistante; $("rEntreprise").value = reglages.entreprise;
     $("rSignature").value = reglages.signature; $("rCoordonnees").value = reglages.coordonnees;
     $("rVoixAuto").checked = !!reglages.voixAuto; $("rVitesse").value = reglages.vitesseVoix || 1;
+    $("rTheme").value = reglages.theme;
+    reglagesAvant = { theme: reglages.theme, accent: reglages.accent, fond: reglages.fond };
+    pastilles();
     afficherDossier();
     $("reglages").showModal();
   };
@@ -728,8 +768,15 @@
     try { await Outils.choisirDossier(); } catch (e) { if (e.name !== "AbortError") alert(e.message); }
     afficherDossier();
   };
+  let reglagesAvant = null;
+  $("rTheme").onchange = () => { reglages.theme = $("rTheme").value; appliquerTheme(); };
   $("reglages").addEventListener("close", () => {
-    if ($("reglages").returnValue !== "ok") return;
+    if ($("reglages").returnValue !== "ok") {
+      // Annuler : on remet l'apparence d'avant (l'aperçu était en direct).
+      if (reglagesAvant) Object.assign(reglages, reglagesAvant);
+      appliquerTheme();
+      return;
+    }
     reglages.prenom = $("rPrenom").value.trim();
     reglages.nomAssistante = $("rNom").value.trim() || "Mon assistante";
     reglages.entreprise = $("rEntreprise").value.trim();
@@ -740,6 +787,25 @@
     stock.ecrire("reglages", reglages);
     appliquerReglages();
   });
+
+  // Pont avec le bureau (bureau.js) : les autres applis peuvent envoyer un
+  // texte ou des fichiers à l'assistante.
+  window.Assistante = {
+    ajouterFichiers,
+    ecrireDoucement,
+    ecrire(texte, nouvelleConv) {
+      if (nouvelleConv) nouvelle();
+      $("message").value = texte;
+      ajusterSaisie();
+      setTimeout(() => { $("message").focus(); $("message").setSelectionRange(texte.length, texte.length); }, 50);
+    },
+    reglages: () => reglages,
+    avance,
+    conversations: () => conversations,
+    documents: () => documents,
+    noterDocument,
+    afficherDossier,
+  };
 
   // ---------------------------------------------------------------- départ
   appliquerReglages();

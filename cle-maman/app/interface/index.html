@@ -8,6 +8,27 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div class="ecran">
+
+<!-- =============================== BUREAU =============================== -->
+<section class="vue" id="vue-bureau" aria-label="Bureau">
+  <div class="bureau">
+    <div class="icones-bureau" id="tuiles" role="list" aria-label="Icônes du bureau"></div>
+    <aside class="widget">
+      <h1 class="bureau-salut" id="bureauSalut">Salut !</h1>
+      <div class="bureau-date" id="bureauDate"></div>
+      <div class="bureau-prive">🔒 Ton espace privé : tout reste dans cet ordinateur</div>
+      <div class="bureau-recents">
+        <h2>Derniers fichiers créés</h2>
+        <div id="bureauRecents" class="recents"></div>
+      </div>
+      <button class="bouton principal plein" id="widgetAssistante">💬 Parler à l'assistante</button>
+    </aside>
+  </div>
+</section>
+
+<!-- ============================= ASSISTANTE ============================= -->
+<section class="vue cache" id="vue-assistante" aria-label="Assistante">
 <div class="appli">
   <!-- ======================= colonne de gauche ======================= -->
   <aside class="cote" id="cote">
@@ -70,11 +91,220 @@
     </footer>
   </main>
 </div>
+</section>
+
+<!-- =========================== MES DOCUMENTS =========================== -->
+<section class="vue cache" id="vue-documents" aria-label="Mes documents">
+  <div class="fenetre">
+    <header class="fenetre-barre">
+      <h1 id="docsTitre">📁 Mes documents</h1>
+      <div class="chemin" id="docsChemin"></div>
+      <div class="fenetre-actions">
+        <button class="bouton" id="docsHaut" title="Dossier précédent">⬆ Remonter</button>
+        <button class="bouton" id="docsNouveau">＋ Nouveau dossier</button>
+        <button class="bouton principal" id="docsAjouter">📥 Ajouter des fichiers</button>
+        <button class="bouton danger cache" id="docsVider">Vider la corbeille</button>
+      </div>
+    </header>
+    <div class="docs-zone" id="docsZone">
+      <div class="docs-vide cache" id="docsBrancher">
+        <div class="gros-emoji">📁</div>
+        <h2>Ouvrons ton dossier « Mes documents »</h2>
+        <p>Clique sur le bouton, puis choisis le dossier <strong>Mes documents</strong> qui est sur ta clé.<br>Tu n'auras à le faire qu'une seule fois.</p>
+        <button class="bouton principal" id="docsChoisir">Choisir le dossier</button>
+      </div>
+      <div class="docs-vide cache" id="docsReconnecter">
+        <div class="gros-emoji">🔌</div>
+        <h2>On reconnecte ton dossier ?</h2>
+        <p>Windows demande ta permission à chaque fois qu'on rebranche la clé.</p>
+        <button class="bouton principal" id="docsReconnecterBtn">Reconnecter « Mes documents »</button>
+      </div>
+      <div class="docs-liste" id="docsListe" role="list"></div>
+    </div>
+    <footer class="fenetre-pied" id="docsPied">Astuce : glisse des fichiers de l'ordinateur dans cette fenêtre pour les copier sur la clé.</footer>
+  </div>
+  <input type="file" id="docsFichiers" multiple hidden>
+</section>
+
+<!-- ============================ CALCULATRICE ============================ -->
+<section class="vue cache" id="vue-calcul" aria-label="Calculatrice">
+  <div class="fenetre etroite">
+    <header class="fenetre-barre"><h1>🧮 Calculatrice</h1></header>
+    <div class="calc">
+      <input class="calc-ecran" id="calcEcran" inputmode="decimal" autocomplete="off" placeholder="0" aria-label="Calcul">
+      <div class="calc-resultat" id="calcResultat">&nbsp;</div>
+      <div class="calc-touches" id="calcTouches"></div>
+      <div class="calc-taxes">
+        <button class="bouton" id="calcPlusTaxes">＋ Taxes (TPS + TVQ)</button>
+        <button class="bouton" id="calcTaxesIncluses">Taxes incluses ?</button>
+      </div>
+      <div class="calc-detail" id="calcDetail"></div>
+      <h2 class="calc-titre-hist">Historique</h2>
+      <div class="calc-hist" id="calcHist"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= BLOC-NOTES ============================= -->
+<section class="vue cache" id="vue-notes" aria-label="Bloc-notes">
+  <div class="fenetre">
+    <header class="fenetre-barre">
+      <h1>📝 Bloc-notes</h1>
+      <div class="fenetre-actions">
+        <button class="bouton" id="notesNouvelle">＋ Nouvelle note</button>
+        <button class="bouton" id="notesWord">📄 Mettre dans Word</button>
+        <button class="bouton principal" id="notesAssistante">💬 Améliorer avec l'assistante</button>
+      </div>
+    </header>
+    <div class="notes">
+      <nav class="notes-liste" id="notesListe"></nav>
+      <div class="notes-edition">
+        <input id="noteTitre" class="note-titre" placeholder="Titre de la note" aria-label="Titre">
+        <textarea id="noteTexte" class="note-texte" placeholder="Écris ici… (c'est enregistré tout seul)" aria-label="Texte de la note"></textarea>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== AFFICHES ============================== -->
+<section class="vue cache" id="vue-affiche" aria-label="Créateur d'affiches">
+  <div class="fenetre">
+    <header class="fenetre-barre"><h1>🖼️ Créateur d'affiches</h1></header>
+    <div class="affiche-zone">
+      <form class="affiche-form" id="afficheForm">
+        <label>Bandeau du haut <input name="accroche" placeholder="PROMO, NOUVEAU, SOLDE…"></label>
+        <label>Titre <input name="titre" placeholder="Batteries d'hiver" required></label>
+        <label>Sous-titre <input name="sous_titre" placeholder="Démarrage garanti par grand froid"></label>
+        <label>Prix <input name="prix" placeholder="149,99 $"></label>
+        <label>Points forts (un par ligne) <textarea name="points" rows="3" placeholder="Installation gratuite&#10;Garantie 3 ans"></textarea></label>
+        <label>Appel à l'action <input name="appel" placeholder="Venez nous voir !"></label>
+        <label>Photo <input type="file" name="photo" accept="image/*"></label>
+        <div class="affiche-choix">
+          <label>Couleur
+            <select name="couleur"><option value="rouge">Rouge</option><option value="bleu">Bleu</option><option value="vert">Vert</option><option value="noir">Noir</option></select>
+          </label>
+          <label>Format
+            <select name="format"><option value="facebook">Facebook</option><option value="imprimer">À imprimer</option></select>
+          </label>
+        </div>
+        <div class="affiche-boutons">
+          <button type="button" class="bouton" id="afficheApercu">👀 Aperçu</button>
+          <button type="submit" class="bouton principal">💾 Enregistrer l'affiche</button>
+        </div>
+      </form>
+      <div class="affiche-apercu" id="afficheApercuZone"><span>L'aperçu apparaîtra ici.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================ GUIDE ================================ -->
+<section class="vue cache" id="vue-guide" aria-label="Guide">
+  <div class="fenetre">
+    <header class="fenetre-barre">
+      <h1>📖 Guide : comment ça marche</h1>
+      <div class="fenetre-actions"><button class="bouton principal" id="guideFini">C'est parti !</button></div>
+    </header>
+    <div class="guide" id="guide"></div>
+  </div>
+</section>
+
+<!-- ============================ ESPACE ALEX ============================ -->
+<section class="vue cache" id="vue-alex" aria-label="Espace Alex">
+  <div class="fenetre">
+    <header class="fenetre-barre alex-barre">
+      <h1>🛠️ Espace Alex</h1>
+      <span class="petit">Réglages techniques — Michelle n'a pas besoin de venir ici.</span>
+    </header>
+    <div class="alex">
+      <article class="alex-carte">
+        <h2>⚡ Moteur IA</h2>
+        <div id="alexMoteur" class="alex-etat">Vérification…</div>
+        <button class="bouton" id="alexRafraichir">⟳ Vérifier</button>
+      </article>
+      <article class="alex-carte">
+        <h2>🎛️ Réglages avancés</h2>
+        <label>Créativité (température) <span id="alexTempVal"></span>
+          <input type="range" id="alexTemp" min="0" max="1.2" step="0.05"></label>
+        <label>Longueur maximale des réponses (jetons)
+          <input type="number" id="alexMax" min="200" max="4000" step="100"></label>
+        <label>Mémoire de la conversation (messages renvoyés)
+          <input type="number" id="alexMemoire" min="2" max="40" step="1"></label>
+        <label>Instructions spéciales (ajoutées à la personnalité)
+          <textarea id="alexInstructions" rows="4" placeholder="Ex. : Le magasin est fermé le dimanche. Toujours proposer la livraison gratuite à Dolbeau."></textarea></label>
+        <div class="alex-boutons">
+          <button class="bouton principal orange" id="alexEnregistrer">Enregistrer</button>
+          <button class="bouton" id="alexDefaut">Valeurs par défaut</button>
+        </div>
+      </article>
+      <article class="alex-carte">
+        <h2>💾 Sauvegarde</h2>
+        <p class="petit">Conversations, notes, réglages et liste des documents, dans un seul fichier.</p>
+        <div class="alex-boutons">
+          <button class="bouton" id="alexExporter">⬇ Exporter une sauvegarde</button>
+          <button class="bouton" id="alexImporter">⬆ Importer</button>
+        </div>
+        <input type="file" id="alexFichier" accept=".json" hidden>
+      </article>
+      <article class="alex-carte">
+        <h2>🧹 Remise à zéro</h2>
+        <div class="alex-boutons col">
+          <button class="bouton" id="alexGuide">Remontrer le guide au prochain démarrage</button>
+          <button class="bouton" id="alexEffacerConv">Effacer toutes les conversations</button>
+          <button class="bouton danger" id="alexToutEffacer">Tout remettre à neuf</button>
+        </div>
+      </article>
+      <article class="alex-carte">
+        <h2>ℹ️ À propos</h2>
+        <div class="petit" id="alexInfos"></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<!-- ============================ MENU DÉMARRER ============================ -->
+<div class="menu-demarrer cache" id="menuDemarrer" role="dialog" aria-label="Menu Démarrer">
+  <input class="menu-recherche" id="menuRecherche" placeholder="🔎 Rechercher une application…" autocomplete="off">
+  <h2>Épinglées</h2>
+  <div class="menu-applis" id="menuApplis"></div>
+  <h2>Recommandé</h2>
+  <div class="menu-recents" id="menuRecents"></div>
+  <footer class="menu-pied">
+    <div class="menu-qui"><span class="avatar" id="menuAvatar">M</span><span id="menuNom">Michelle</span></div>
+    <span class="petit">Pour éteindre : ferme la fenêtre (✕ en haut à droite)</span>
+  </footer>
+</div>
+
+<!-- =========================== BARRE DES TÂCHES =========================== -->
+<nav class="barre-taches" aria-label="Barre des tâches">
+  <div class="taches" id="taches">
+    <button class="tache demarrer" id="boutonDemarrer" title="Démarrer" aria-label="Menu Démarrer" aria-expanded="false"><img src="icone.svg" alt=""></button>
+  </div>
+  <button class="tache-alex" data-vue="alex" id="boutonAlex" title="Espace Alex (réglages techniques)">Alex</button>
+  <div class="zone-notif">
+    <span title="Tout reste dans cet ordinateur">🔒</span>
+    <div class="horloge" id="horloge"></div>
+  </div>
+</nav>
 
 <!-- ============================== réglages ============================== -->
 <dialog id="reglages" class="dialogue">
   <form method="dialog">
     <h2>Réglages</h2>
+    <fieldset class="groupe">
+      <legend>Apparence</legend>
+      <label>Thème
+        <select id="rTheme">
+          <option value="auto">🌗 Automatique : clair le jour, sombre le soir</option>
+          <option value="clair">☀️ Clair</option>
+          <option value="sombre">🌙 Sombre</option>
+          <option value="systeme">🖥️ Comme Windows</option>
+        </select>
+      </label>
+      <div class="choix-couleurs" id="rAccents" role="radiogroup" aria-label="Couleur"></div>
+      <div class="choix-fonds" id="rFonds" role="radiogroup" aria-label="Fond d'écran"></div>
+    </fieldset>
     <label>Ton prénom <input id="rPrenom" autocomplete="off"></label>
     <label>Nom de l'assistante <input id="rNom" autocomplete="off"></label>
     <label>Entreprise <input id="rEntreprise" autocomplete="off"></label>
@@ -116,5 +346,6 @@
 <script src="markdown.js"></script>
 <script src="outils.js"></script>
 <script src="app.js"></script>
+<script src="bureau.js"></script>
 </body>
 </html>
