@@ -116,7 +116,7 @@ function Mettre-A-Jour-Raccourci($racine, $app) {
     try {
         $sh = New-Object -ComObject WScript.Shell
         $lnk = $sh.CreateShortcut((Join-Path $racine 'Mon assistante.lnk'))
-        $lnk.TargetPath = Join-Path $racine "Démarrer l'assistante.cmd"
+        $lnk.TargetPath = Join-Path $racine "▶️ Démarrer l'assistante.cmd"
         $lnk.WorkingDirectory = $racine
         $lnk.IconLocation = (Join-Path $app 'interface\icone.ico') + ',0'
         $lnk.WindowStyle = 7

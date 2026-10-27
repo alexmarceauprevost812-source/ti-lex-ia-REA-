@@ -66,7 +66,7 @@ function Mettre-A-Jour-Raccourci($racine, $app) {
     try {
         $sh = New-Object -ComObject WScript.Shell
         $lnk = $sh.CreateShortcut((Join-Path $racine 'Mon assistante.lnk'))
-        $lnk.TargetPath = Join-Path $racine "Démarrer l'assistante.cmd"
+        $lnk.TargetPath = Join-Path $racine "▶️ Démarrer l'assistante.cmd"
         $lnk.WorkingDirectory = $racine
         $lnk.IconLocation = (Join-Path $app 'interface\icone.ico') + ',0'
         $lnk.WindowStyle = 7
@@ -89,7 +89,7 @@ if (-not $modele -or -not (Test-Path $cpu)) {
         "L'intelligence artificielle n'est pas encore sur la clé.`n`nLa télécharger maintenant ? Il faut internet (de 2 à 7 Go, selon l'ordinateur).",
         'Mon assistante', 'YesNo', 'Question')
     if ($r -ne 'Yes') { exit 0 }
-    $p = Start-Process cmd.exe -ArgumentList "/c `"`"$racine\Installer l'IA (un clic).cmd`"`"" -PassThru -Wait
+    $p = Start-Process cmd.exe -ArgumentList "/c `"`"$racine\⬇️ Installer l'IA (un clic).cmd`"`"" -PassThru -Wait
     $modele = Get-ChildItem $modeles -Filter *.gguf -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch 'mmproj' } | Select-Object -First 1
     if (-not $modele -or -not (Test-Path $cpu)) { exit 1 }
 }
