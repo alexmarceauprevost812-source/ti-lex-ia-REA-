@@ -151,7 +151,9 @@
       try {
         const d = await sousDossier(chemin, true);
         let final = nom;
-        for (let n = 2; await existe(d, final); n++) final = nom.replace(/(\.[^.]+)$/, ` (${n})$1`);
+        // « Lettre.docx » -> « Lettre (2).docx » ; « README » -> « README (2) ».
+        const [, base, ext = ""] = nom.match(/^(.*?)(\.[^.\s]+)?$/);
+        for (let n = 2; await existe(d, final); n++) final = `${base} (${n})${ext}`;
         const f = await d.getFileHandle(final, { create: true });
         const w = await f.createWritable();
         await w.write(blob);
@@ -164,8 +166,15 @@
     }
     // Le lanceur règle la fenêtre pour que les téléchargements aillent dans
     // « Mes documents » sur la clé.
-    telecharger(blob, nom);
-    return { nom, ou: "Mes documents", mode: "telechargement", blob };
+    // Sans dossier branché, on ne peut pas vérifier si le nom existe déjà
+    // (Edge ajouterait « (1) » en cachette). On ajoute donc la date et l'heure
+    // au nom : il est unique, et on sait exactement comment le fichier s'appelle.
+    const d = new Date(), z2 = (x) => String(x).padStart(2, "0");
+    const horodate = `${d.getFullYear()}-${z2(d.getMonth() + 1)}-${z2(d.getDate())} ${z2(d.getHours())}h${z2(d.getMinutes())}m${z2(d.getSeconds())}`;
+    const [, base, ext = ""] = nom.match(/^(.*?)(\.[^.\s]+)?$/);
+    const unique = `${base} ${horodate}${ext}`;
+    telecharger(blob, unique);
+    return { nom: unique, ou: "Mes documents", mode: "telechargement", blob };
   }
 
   async function creerDossier(nom) {
