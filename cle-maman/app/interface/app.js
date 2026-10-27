@@ -467,7 +467,10 @@
         const [tete, ...corps] = tableau.rows;
         const plat = (t) => M.morceaux(t).map((m) => m.text).join("");
         const nums = tete.map((_, c) => corps.length && corps.every((r) => Outils.lireNombre(plat(r[c] || "")) !== null));
-        const totaliser = tete.filter((_, c) => nums[c] && !/(no|num|#|code|année|an|qté unitaire)/i.test(plat(tete[c]))).map(plat);
+        // On n'additionne pas les colonnes d'identifiants (numéro, code, année,
+        // téléphone…) — mots entiers seulement : « Quantité » et « Montant » restent.
+        const estIdentifiant = (h) => /^\s*(n[o°º]\.?|num[ée]ro|#|code|ann[ée]e|an|id|t[ée]l(?:[ée]phone)?|prix unitaire|qt[ée] unitaire)(\b|\s|$)/i.test(h);
+        const totaliser = tete.filter((_, c) => nums[c] && !estIdentifiant(plat(tete[c]))).map(plat);
         const blob = Outils.xlsxDepuisTableau(nom, tete.map(plat), corps.map((r) => r.map(plat)), totaliser);
         const f = await Outils.enregistrer(blob, Outils.nomPropre(nom, "xlsx"));
         noterDocument({ ...f, icone: "📊" });
@@ -758,7 +761,12 @@
       ajouterActions(vue.actions, aGarder);
       if (reglages.voixAuto && vue.actions._ecouter) voix.lire(aGarder.texte, vue.actions._ecouter);
     }
-    if (courante === conv) afficherListe();
+    if (courante === conv) {
+      // Elle est revenue dans cette conversation pendant que la réponse
+      // s'écrivait : l'ancien affichage a été remplacé, on redessine le fil.
+      if (!vue.box.isConnected) afficherConversation();
+      afficherListe();
+    }
     defiler();
   }
 

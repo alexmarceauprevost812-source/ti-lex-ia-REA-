@@ -319,7 +319,12 @@
     const argentCol = new Array(nbCol).fill(false);
     const formatsPct = {};
     let lignesVues = 0;
-    const corps = (lignes || []).map((l) => (lignesVues++, Array.from({ length: nbCol }, (_, c) => {
+    // On ajoute nous-mêmes la ligne « Total » : une ligne Total / Sous-total
+    // déjà présente serait comptée deux fois. (Les lignes TPS/TVQ restent : la
+    // somme des articles + taxes donne bien le total.)
+    const estResume = (l) => /^\s*(sous[- ]?total|grand[- ]?total|total)\b/i.test(String((l || []).find((x) => String(x ?? "").trim() !== "") ?? ""));
+    const lignesUtiles = (aTotaliser || []).length ? (lignes || []).filter((l) => !estResume(l)) : (lignes || []);
+    const corps = lignesUtiles.map((l) => (lignesVues++, Array.from({ length: nbCol }, (_, c) => {
       const brut = (l || [])[c];
       const n = lireNombre(brut);
       if (n !== null && /\$/.test(String(brut))) argentCol[c] = true;
