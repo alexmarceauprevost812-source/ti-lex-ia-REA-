@@ -91,6 +91,29 @@ def test_draw_diagram_demande_avant_de_remplacer(config):
     assert "refusé" in t.call("draw_diagram", {"code": "flowchart TD\n A-->C", "name": "x"})
 
 
+def test_draw_diagram_demande_si_seul_le_mmd_existe(config):
+    dossier = config.workspace / "schemas"
+    dossier.mkdir(parents=True)
+    (dossier / "plan.mmd").write_text("source à la main", encoding="utf-8")
+    out = toolbox(config, answer=False).call("draw_diagram", {"code": "flowchart TD\n A-->B", "name": "plan"})
+    assert "refusé" in out
+    assert (dossier / "plan.mmd").read_text(encoding="utf-8") == "source à la main"
+
+
+def test_draw_diagram_refuse_un_lien_vers_l_exterieur(config, tmp_path):
+    dehors = tmp_path / "dehors.txt"
+    dehors.write_text("intact", encoding="utf-8")
+    dossier = config.workspace / "schemas"
+    dossier.mkdir(parents=True)
+    try:
+        (dossier / "fuite.mmd").symlink_to(dehors)
+    except OSError:
+        pytest.skip("liens symboliques non disponibles")
+    out = toolbox(config).call("draw_diagram", {"code": "flowchart TD\n A-->B", "name": "fuite"})
+    assert "en dehors" in out
+    assert dehors.read_text(encoding="utf-8") == "intact"
+
+
 def test_draw_diagram_erreur_lisible(config):
     assert "n'est pas un type" in toolbox(config).call("draw_diagram", {"code": "salut"})
 

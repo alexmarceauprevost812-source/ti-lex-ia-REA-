@@ -263,9 +263,15 @@ class Toolbox:
     def tool_draw_diagram(self, code: str, name: str = "schema", title: str | None = None) -> str:
         from .schema import SchemaError, dessiner, nom_sur
 
-        base = self._resolve(f"schemas/{nom_sur(name)}")
-        if base.with_suffix(".html").exists() and not self.confirm(
-                f"Remplacer le schéma existant « schemas/{base.name} » ?"):
+        nom = nom_sur(name)
+        base = self._resolve(f"schemas/{nom}")
+        # Chaque fichier écrit est vérifié séparément : un lien symbolique
+        # schemas/x.mmd vers l'extérieur serait sinon suivi à l'écriture.
+        sorties = [self._resolve(f"schemas/{nom}{ext}") for ext in (".mmd", ".html", ".png")]
+        existants = [p for p in sorties if p.exists()]
+        if existants and not self.confirm(
+                f"Remplacer le schéma existant « schemas/{nom} » "
+                f"({', '.join(p.suffix for p in existants)}) ?"):
             raise ToolError("L'utilisateur a refusé de remplacer ce schéma.")
         try:
             crees = dessiner(code, base, self.config.moteurs, title)
