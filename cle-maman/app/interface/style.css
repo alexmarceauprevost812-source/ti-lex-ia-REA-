@@ -465,6 +465,19 @@ body { display: grid; grid-template-rows: 1fr 52px; height: 100vh; overflow: hid
 .machine-grille div { display: flex; flex-direction: column; gap: 2px; background: var(--fond); border-radius: 8px; padding: 8px 12px; }
 .installation { border-left: 4px solid var(--accent); display: flex; flex-direction: column; gap: 8px; }
 .inst-message { font-weight: 600; }
+.inst-haut { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.inst-pourcent { font-size: 2em; font-weight: 700; color: var(--accent); line-height: 1; }
+.inst-etapes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; }
+.inst-etapes li { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; background: rgba(127,127,127,.08); font-size: .9em; color: var(--doux); }
+.inst-etapes li.fait { color: var(--texte); }
+.inst-etapes li.encours { color: var(--texte); font-weight: 600; background: color-mix(in srgb, var(--accent) 14%, transparent); outline: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+.inst-etapes .puce { width: 22px; text-align: center; }
+.inst-etapes li.encours .puce { animation: tourne 1.6s linear infinite; display: inline-block; }
+@keyframes tourne { to { transform: rotate(360deg); } }
+.inst-chiffres { font-size: .95em; font-variant-numeric: tabular-nums; }
+.inst-conseil { font-size: .9em; padding: 8px 12px; border-radius: 8px; background: color-mix(in srgb, #c47f00 16%, transparent); }
+.pilule-installation { border: 0; border-radius: 16px; padding: 6px 12px; margin-right: 8px; cursor: pointer; font-weight: 600; background: color-mix(in srgb, var(--accent) 18%, var(--carte)); color: var(--texte); font-variant-numeric: tabular-nums; }
+.pilule-installation:hover { background: color-mix(in srgb, var(--accent) 30%, var(--carte)); }
 .progres.grand { height: 12px; border-radius: 6px; }
 .progres > div.indetermine { width: 35% !important; animation: va-vient 1.4s ease-in-out infinite; }
 @keyframes va-vient { 0% { margin-left: 0; } 50% { margin-left: 65%; } 100% { margin-left: 0; } }

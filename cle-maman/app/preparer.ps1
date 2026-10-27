@@ -33,18 +33,26 @@ function Ecrire-Etat($statut, $etape, $message, $fichier = '', $taille = 0) {
 function Titre($t) { Write-Host ""; Write-Host "== $t ==" -ForegroundColor Cyan }
 function Info($t) { Write-Host "   $t" }
 
+# Taille d'un fichier en ligne, pour afficher le pourcentage. Hugging Face
+# renvoie vers un autre serveur : on lit « x-linked-size » ou la dernière
+# « content-length » de toute la chaîne (curl.exe suit les redirections).
 function Taille-Distante($url) {
     try {
-        $r = Invoke-WebRequest $url -Method Head -UseBasicParsing -MaximumRedirection 10 -Headers @{ 'User-Agent' = 'assistante' }
-        return [int64]($r.Headers['Content-Length'] | Select-Object -First 1)
-    } catch { return 0 }
+        $entetes = & curl.exe -s -I -L --max-time 20 -A 'assistante' $url
+        $lie = $entetes | Where-Object { $_ -match '^x-linked-size:\s*(\d+)' } | Select-Object -Last 1
+        if ($lie -and $lie -match '(\d+)\s*$') { return [int64]$Matches[1] }
+        $long = $entetes | Where-Object { $_ -match '^content-length:\s*(\d+)' } | Select-Object -Last 1
+        if ($long -and $long -match '(\d+)\s*$') { return [int64]$Matches[1] }
+    } catch {}
+    return 0
 }
 
-function Telecharger($url, $dest, $etape, $quoi) {
+function Telecharger($url, $dest, $etape, $quoi, [int64]$taille = 0) {
     if (Test-Path $dest) { Info "Déjà là : $(Split-Path -Leaf $dest)"; return }
     Info "Téléchargement de $(Split-Path -Leaf $dest)..."
     $tmp = "$dest.partiel"
-    Ecrire-Etat 'encours' $etape "Téléchargement $quoi…" $tmp (Taille-Distante $url)
+    if ($taille -le 0) { $taille = Taille-Distante $url }
+    Ecrire-Etat 'encours' $etape "Téléchargement $quoi…" $tmp $taille
     # curl.exe est fourni avec Windows 10 et 11 ; -C - reprend un téléchargement coupé.
     & curl.exe -L --fail --retry 5 --retry-delay 3 -C - -s -S -o $tmp $url
     if ($LASTEXITCODE -ne 0) { throw "Le téléchargement a échoué. Vérifie la connexion internet, puis réessaie : ce qui est déjà téléchargé sera gardé." }
@@ -58,7 +66,7 @@ function Moteur($motif, $dossier, $etape) {
     $asset = $rel.assets | Where-Object { $_.name -match $motif } | Select-Object -First 1
     if (-not $asset) { throw "Moteur introuvable dans la version $($rel.tag_name) ($motif)." }
     $zip = Join-Path $moteurs $asset.name
-    Telecharger $asset.browser_download_url $zip $etape 'du moteur'
+    Telecharger $asset.browser_download_url $zip $etape 'du moteur' ([int64]$asset.size)
     Ecrire-Etat 'encours' $etape 'Décompression du moteur…'
     New-Item -ItemType Directory -Force $dest | Out-Null
     Expand-Archive -Force $zip $dest
@@ -148,15 +156,21 @@ try {
     Ecrire-Etat 'encours' 3 'Je cherche le modèle…'
     New-Item -ItemType Directory -Force $dossierModele | Out-Null
     $depot = $choisi.depot
-    try { $infos = Invoke-RestMethod "https://huggingface.co/api/models/$depot" -Headers @{ 'User-Agent' = 'assistante' } }
+    # « blobs=true » : la liste des fichiers avec leur taille (pour le pourcentage).
+    try { $infos = Invoke-RestMethod "https://huggingface.co/api/models/${depot}?blobs=true" -Headers @{ 'User-Agent' = 'assistante' } }
     catch { throw "Ce modèle n'est pas disponible en ce moment. Essaie un autre modèle, ou réessaie plus tard." }
     $fichiers = $infos.siblings.rfilename
     $principal = $fichiers | Where-Object { $_ -match 'Q4_K_M\.gguf$' -and $_ -notmatch 'mmproj' } | Select-Object -First 1
     $vision = ($fichiers | Where-Object { $_ -match 'mmproj.*Q8_0\.gguf$' } | Select-Object -First 1)
     if (-not $vision) { $vision = $fichiers | Where-Object { $_ -match 'mmproj.*\.gguf$' } | Select-Object -First 1 }
     if (-not $principal) { throw "Ce modèle n'a pas de version légère (Q4_K_M)." }
-    Telecharger "https://huggingface.co/$depot/resolve/main/$principal" (Join-Path $dossierModele (Split-Path -Leaf $principal)) 3 'du cerveau de l''assistante'
-    if ($vision) { Telecharger "https://huggingface.co/$depot/resolve/main/$vision" (Join-Path $dossierModele (Split-Path -Leaf $vision)) 4 'des yeux (pour lire les photos)' }
+    $taillePrincipal = [int64](($infos.siblings | Where-Object { $_.rfilename -eq $principal } | Select-Object -First 1).size)
+    if ($taillePrincipal -le 0) { $taillePrincipal = [int64]($choisi.taille_go * 0.9 * 1GB) }   # estimation si le site ne la donne pas
+    Telecharger "https://huggingface.co/$depot/resolve/main/$principal" (Join-Path $dossierModele (Split-Path -Leaf $principal)) 3 'du cerveau de l''assistante' $taillePrincipal
+    if ($vision) {
+        $tailleVision = [int64](($infos.siblings | Where-Object { $_.rfilename -eq $vision } | Select-Object -First 1).size)
+        Telecharger "https://huggingface.co/$depot/resolve/main/$vision" (Join-Path $dossierModele (Split-Path -Leaf $vision)) 4 'des yeux (pour lire les photos)' $tailleVision
+    }
     # Tout est là : on le note. Sans ce fichier, le modèle n'est pas considéré
     # comme installé (un téléchargement coupé pourra être repris).
     Set-Content -Path (Join-Path $dossierModele 'installe.ok') -Value (Get-Date -Format s) -Encoding ASCII

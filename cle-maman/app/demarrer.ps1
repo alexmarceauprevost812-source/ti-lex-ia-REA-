@@ -198,13 +198,18 @@ function Repondre($flux, $code, $type, [byte[]]$corps) {
 function Json($objet) { return [System.Text.Encoding]::UTF8.GetBytes(($objet | ConvertTo-Json -Compress -Depth 5)) }
 
 function Etat-Installation {
-    $e = [ordered]@{ etat = 'attente'; etape = 0; message = ''; pourcent = $null; machine = ''; modele = $script:modeleEnCours }
+    $e = [ordered]@{ etat = 'attente'; etape = 0; message = ''; pourcent = $null; recu = 0; total = 0; machine = ''; modele = $script:modeleEnCours }
     if ($script:installeur -and (Test-Path $etatFichier)) {
         try {
             $lu = Get-Content $etatFichier -Raw -Encoding UTF8 | ConvertFrom-Json
             $e.etat = $lu.etat; $e.etape = $lu.etape; $e.message = $lu.message; $e.machine = $lu.machine
-            if ($lu.fichier -and $lu.taille -gt 0 -and (Test-Path $lu.fichier)) {
-                $e.pourcent = [math]::Min(100, [math]::Round((Get-Item $lu.fichier).Length * 100 / $lu.taille))
+            if ($lu.fichier -and (Test-Path $lu.fichier)) {
+                # Octets déjà reçus : le bureau en tire la vitesse et le temps restant.
+                $e.recu = [int64](Get-Item $lu.fichier).Length
+                if ($lu.taille -gt 0) {
+                    $e.total = [int64]$lu.taille
+                    $e.pourcent = [math]::Min(100, [math]::Round($e.recu * 100 / $lu.taille))
+                }
             }
         } catch { }
     } elseif ($script:installeur) { $e.etat = 'encours'; $e.message = 'Préparation…' }

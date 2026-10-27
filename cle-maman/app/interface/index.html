@@ -240,9 +240,15 @@
         <div class="machine-grille" id="machineInfos"><span class="petit">Je lis l'ordinateur…</span></div>
       </article>
       <article class="installation cache" id="installation">
-        <h2 id="instTitre">⏳ Installation en cours</h2>
+        <div class="inst-haut">
+          <h2 id="instTitre">⏳ Installation en cours</h2>
+          <div class="inst-pourcent" id="instPourcent" aria-live="polite"></div>
+        </div>
+        <ol class="inst-etapes" id="instEtapes" aria-label="Étapes de l'installation"></ol>
         <div id="instMessage" class="inst-message"></div>
-        <div class="progres grand"><div id="instBarre"></div></div>
+        <div class="progres grand" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="instProgres"><div id="instBarre"></div></div>
+        <div class="inst-chiffres" id="instChiffres"></div>
+        <div class="inst-conseil cache" id="instConseil"></div>
         <div class="petit" id="instDetail"></div>
         <div class="alex-boutons"><button class="bouton principal cache" id="instAller">💬 Aller à l'assistante</button></div>
       </article>
@@ -337,6 +343,7 @@
   <div class="taches" id="taches">
     <button class="tache demarrer" id="boutonDemarrer" title="Démarrer" aria-label="Menu Démarrer" aria-expanded="false"><img src="icone.svg" alt=""></button>
   </div>
+  <button class="pilule-installation cache" id="piluleInstallation" title="Voir l'installation de l'IA">⏳ IA <span id="pilulePourcent">…</span></button>
   <button class="tache-alex" data-vue="alex" id="boutonAlex" title="Espace Alex (réglages techniques)">Alex</button>
   <div class="zone-notif">
     <span title="Tout reste dans cet ordinateur">🔒</span>

@@ -588,15 +588,71 @@
     dessinerEtat() {
       const e = this.etat;
       const zone = $("installation");
+      this.pilule(e);
       if (!e || e.etat === "attente") { if (!this.finVue) zone.classList.add("cache"); return; }
       zone.classList.remove("cache");
       const titres = { encours: "⏳ Installation en cours", fini: "✅ C'est installé !", erreur: "⚠️ L'installation n'a pas fonctionné" };
       $("instTitre").textContent = titres[e.etat] || "Installation";
-      $("instMessage").textContent = e.etat === "encours" ? `Étape ${e.etape || 1} sur 4 — ${e.message || "…"}` : (e.message || "");
+      if (e.etat === "encours" && e.etape) this.derniereEtape = e.etape;
+      const etape = e.etat === "fini" ? 5 : (e.etape || this.derniereEtape || 1);
+      // Les 4 étapes, cochées au fur et à mesure.
+      const noms = ["Lire l'ordinateur", "Le moteur", "Le cerveau", "Les yeux (photos)"];
+      $("instEtapes").innerHTML = noms.map((n, i) => {
+        const k = i + 1;
+        const classe = k < etape ? "fait" : k === etape && e.etat === "encours" ? "encours" : k === etape && e.etat === "erreur" ? "erreur" : "";
+        const puce = classe === "fait" ? "✅" : classe === "encours" ? "⏳" : classe === "erreur" ? "⚠️" : "○";
+        return `<li class="${classe}"><span class="puce">${puce}</span>${k}. ${n}</li>`;
+      }).join("");
+      $("instMessage").textContent = e.etat === "encours" ? `Étape ${etape} sur 4 — ${e.message || "…"}` : (e.message || "");
       const barre = $("instBarre");
-      barre.classList.toggle("indetermine", e.etat === "encours" && e.pourcent == null);
-      barre.style.width = e.etat === "fini" ? "100%" : e.pourcent != null ? e.pourcent + "%" : "35%";
+      const p = e.etat === "fini" ? 100 : e.pourcent;
+      barre.classList.toggle("indetermine", e.etat === "encours" && p == null);
+      barre.style.width = p != null ? p + "%" : "35%";
+      $("instProgres").setAttribute("aria-valuenow", p != null ? String(p) : "");
+      $("instPourcent").textContent = p != null && e.etat !== "erreur" ? `${p} %` : "";
+      $("instChiffres").textContent = e.etat === "encours" ? this.chiffres(e) : "";
       $("instDetail").textContent = (e.machine || "") + (e.etat === "encours" ? " — Garde la fenêtre ouverte. Tu peux continuer à utiliser le reste du bureau." : "");
+    },
+    // « 1,2 Go sur 2,5 Go · 3,4 Mo/s · encore environ 6 min » + conseil si ça bloque.
+    chiffres(e) {
+      const conseil = $("instConseil");
+      const go = (o) => o < 1073741824 ? `${Math.round(o / 1048576)} Mo` : `${(o / 1073741824).toFixed(o >= 10737418240 ? 0 : 1).replace(".", ",")} Go`;
+      const recu = e.recu || 0, total = e.total || 0;
+      if (!recu && !total) { conseil.classList.add("cache"); return ""; }
+      const now = Date.now();
+      const h = (this.historique = (this.historique || []).filter((x) => now - x.t < 15000 && x.recu <= recu));
+      if (!h.length || h[h.length - 1].recu !== recu) h.push({ t: now, recu });
+      if (!this.bouge || recu !== this.bouge.recu) this.bouge = { t: now, recu };
+      let vitesse = 0;
+      if (h.length > 1 && now - h[0].t > 1500) vitesse = (recu - h[0].recu) / ((now - h[0].t) / 1000);
+      const morceaux = [total ? `${go(recu)} sur ${go(total)}` : `${go(recu)} reçus`];
+      if (vitesse > 0) {
+        const mo = vitesse / 1048576;
+        morceaux.push(`${mo >= 10 ? Math.round(mo) : mo.toFixed(1).replace(".", ",")} Mo/s`);
+        if (total > recu) {
+          const s = (total - recu) / vitesse;
+          const m = Math.round(s / 60);
+          morceaux.push(s < 60 ? "encore moins d'une minute" : m < 60 ? `encore environ ${m} min` : `encore environ ${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")}`);
+        }
+      }
+      const fige = now - this.bouge.t > 60000;
+      conseil.classList.toggle("cache", !fige);
+      if (fige) conseil.textContent = "🐢 Rien n'a bougé depuis une minute. Vérifie que l'ordinateur est bien connecté à internet. Ne ferme pas la fenêtre : ça reprendra là où c'était rendu.";
+      return morceaux.join(" · ");
+    },
+    // Petite pastille dans la barre des tâches : on voit l'avancement de partout.
+    pilule(e) {
+      const p = $("piluleInstallation");
+      const encours = e && e.etat === "encours";
+      p.classList.toggle("cache", !encours);
+      if (!this.titreAvant) this.titreAvant = document.title;
+      if (encours) {
+        const txt = e.pourcent != null ? `${e.pourcent} %` : `étape ${e.etape || 1}/4`;
+        $("pilulePourcent").textContent = txt;
+        document.title = `⏳ ${txt} — installation de l'IA`;
+      } else if (document.title.startsWith("⏳")) {
+        document.title = this.titreAvant;
+      }
     },
     suivre() {
       clearInterval(this.minuterie);
@@ -619,6 +675,8 @@
       if (!confirm(`Installer « ${m.nom} » (environ ${String(m.taille_go).replace(".", ",")} Go) ? Il faut internet pendant le téléchargement.`)) return;
       try { this.etat = await service("installer?id=" + encodeURIComponent(m.id), { method: "POST" }); } catch (e) { alert(e.message); return; }
       this.dessiner(); this.suivre();
+      // On amène la progression sous ses yeux.
+      setTimeout(() => $("installation").scrollIntoView({ behavior: "smooth", block: "center" }), 100);
     },
     async activer(m) {
       try { await service("activer?id=" + encodeURIComponent(m.id), { method: "POST" }); } catch (e) { alert(e.message); return; }
@@ -650,9 +708,12 @@
           }
           // Réponse de notre petit serveur de secours : le moteur n'a pas
           // voulu démarrer avec ce modèle -> on le dit et on laisse choisir.
-          if (r.status === 503 && SERVICE === "") {
-            const l = await service("modeles").catch(() => null);
+          // (Après un changement de modèle raté, le service est passé du port
+          // 8766 à ce bureau de secours : on le retrouve à la même adresse.)
+          if (r.status === 503) {
+            const l = await fetch("/service/modeles", { cache: "no-store" }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
             if (l && l.panne) {
+              SERVICE = "";
               $("installation").classList.add("cache");
               this.finVue = false;
               await this.charger(); this.dessiner();
@@ -666,6 +727,7 @@
     },
   };
   $("instAller").onclick = () => ouvrir("assistante");
+  $("piluleInstallation").onclick = () => ouvrir("modeles");
 
   // Icône « Mon assistante » sur le bureau Windows de l'ordinateur
   async function etatRaccourci() {
