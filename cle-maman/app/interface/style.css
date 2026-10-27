@@ -505,3 +505,5 @@ html.verrouille .ecran-verrou { display: flex; }
 .boutons-mdp { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .mdp-erreur { color: #c42b1c; min-height: 1.2em; font-size: .9em; }
 :root[data-theme="sombre"] .mdp-erreur { color: #ff99a4; }
+
+.modeles-panne { border-left: 4px solid #c42b1c; }

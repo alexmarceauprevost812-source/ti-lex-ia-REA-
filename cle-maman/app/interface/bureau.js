@@ -544,6 +544,7 @@
         : `<span class="petit">Le moteur de lecture du PC ne répond pas. Ferme la fenêtre et relance « ▶️ START ».</span>`;
       const aucun = !this.liste || !this.liste.installes.length;
       $("modelesIntro").classList.toggle("cache", !aucun);
+      $("modelesPanne").classList.toggle("cache", !(this.liste && this.liste.panne));
       const enCours = this.etat && this.etat.etat === "encours";
       const reco = this.recommande();
       const z = $("cartesModeles");
@@ -646,6 +647,17 @@
             $("instAller").classList.remove("cache");
             setTimeout(() => { this.finVue = false; this.charger().then(() => this.dessiner()); }, 1500);
             return;
+          }
+          // Réponse de notre petit serveur de secours : le moteur n'a pas
+          // voulu démarrer avec ce modèle -> on le dit et on laisse choisir.
+          if (r.status === 503 && SERVICE === "") {
+            const l = await service("modeles").catch(() => null);
+            if (l && l.panne) {
+              $("installation").classList.add("cache");
+              this.finVue = false;
+              await this.charger(); this.dessiner();
+              return;
+            }
           }
         } catch {}
         setTimeout(essai, 2000);
@@ -755,6 +767,6 @@
   fetch("/service/modeles", { cache: "no-store" }).then((r) => {
     if (!r.ok) return;
     SERVICE = "";
-    return r.json().then((l) => { if (!l.installes.length) ouvrir("modeles"); });
+    return r.json().then((l) => { if (!l.installes.length || l.panne) ouvrir("modeles"); });
   }).catch(() => {});
 })();

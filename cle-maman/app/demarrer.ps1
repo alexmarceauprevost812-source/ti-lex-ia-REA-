@@ -184,7 +184,7 @@ function Liste-Modeles {
             if ($somme) { $deja[$_.Name] = [math]::Round($somme / 1GB, 2) }
         }
     }
-    return [ordered]@{ actif = $actif; installes = $installes; deja = $deja; moteur = (Test-Path $cpu) }
+    return [ordered]@{ actif = $actif; installes = $installes; deja = $deja; moteur = (Test-Path $cpu); panne = [bool]$script:moteurEnPanne }
 }
 
 function Repondre($flux, $code, $type, [byte[]]$corps) {
@@ -369,20 +369,33 @@ function En-Installation {
 if ((Pret) -or (En-Installation)) { Ouvrir-Fenetre | Out-Null; exit 0 }
 
 $script:serveur = $null
+$script:moteurEnPanne = $false
 $fenetre = $null
 $ecoute = $null
-if (IA-Installee) {
-    if (-not (Demarrer-Moteur $true)) {
-        Avertir "L'assistante n'a pas pu démarrer.`n`nRedémarre l'ordinateur et réessaie. Si ça continue, montre ce fichier à Alex :`n$journal"
-        exit 1
-    }
-    $ecoute = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, $portService)
-} else {
-    # Pas encore d'IA : le bureau s'ouvre quand même, sur l'appli « Modèles IA ».
-    $script:modeInstallation = $true
-    $ecoute = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, $port)
+
+# Ouvre l'écoute qui convient : avec le moteur, seulement le service (8766) ;
+# sans moteur (pas encore d'IA, ou le modèle choisi ne démarre pas sur cet
+# ordinateur), c'est nous qui servons le bureau (8765) pour qu'elle puisse
+# choisir ou installer un autre modèle dans « Modèles IA ».
+function Ecouter($moteurOk) {
+    if ($script:ecoute) { try { $script:ecoute.Stop() } catch {} }
+    $script:modeInstallation = -not $moteurOk
+    $p = if ($moteurOk) { $portService } else { $port }
+    $script:ecoute = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, $p)
+    $script:ecoute.Start()
 }
-$ecoute.Start()
+function Essayer-Moteur($avecEcran) {
+    $ok = $false
+    try { $ok = [bool](Demarrer-Moteur $avecEcran) } catch { $ok = $false }
+    if (-not $ok -and $script:form) { try { $script:form.Close() } catch {} }
+    $script:moteurEnPanne = -not $ok
+    if (-not $ok) { try { Add-Content $journal "`r`n[$(Get-Date)] Le moteur n'a pas démarré avec ce modèle : retour à « Modèles IA »." } catch {} }
+    Ecouter $ok
+}
+
+if (IA-Installee) { Essayer-Moteur $true }
+else { Ecouter $false }   # Pas encore d'IA : le bureau s'ouvre sur « Modèles IA ».
+$ecoute = $script:ecoute
 $fenetre = Ouvrir-Fenetre
 
 $derniereVerif = Get-Date
@@ -396,19 +409,25 @@ try {
             $fin = (Get-Date).AddSeconds(3)   # le temps que la fenêtre lise « fini »
             while ((Get-Date) -lt $fin) { if ($ecoute.Pending()) { Servir $ecoute.AcceptTcpClient() $true } else { Start-Sleep -Milliseconds 40 } }
             $ecoute.Stop()
-            $script:modeInstallation = $false
-            if (-not (Demarrer-Moteur $false)) {
-                Avertir "L'intelligence artificielle est installée, mais elle n'a pas pu démarrer.`n`nFerme la fenêtre, redémarre l'ordinateur et réessaie. Si ça continue, montre ce fichier à Alex :`n$journal"
+            $script:installeur = $null
+            # Le modèle actif ne démarrait pas : celui qu'elle vient d'installer le remplace.
+            if ($script:moteurEnPanne -and $script:modeleEnCours -and (Test-Path (Join-Path (Join-Path $modeles $script:modeleEnCours) 'installe.ok'))) {
+                [System.IO.File]::WriteAllText((Join-Path $modeles 'choix.json'), (@{ actif = $script:modeleEnCours } | ConvertTo-Json -Compress), (New-Object System.Text.UTF8Encoding($false)))
             }
-            $ecoute = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, $portService)
-            $ecoute.Start()
+            Essayer-Moteur $false
+            $ecoute = $script:ecoute
         }
 
-        # Changement de modèle demandé dans l'appli : on redémarre le moteur.
-        if ($script:activerDemande -and -not $script:modeInstallation) {
+        # Changement de modèle demandé dans l'appli (aussi depuis le bureau de
+        # secours quand le modèle précédent ne démarrait pas) : on (re)démarre le moteur.
+        if ($script:activerDemande -and -not ($script:installeur -and -not $script:installeur.HasExited)) {
             $script:activerDemande = $null
+            $fin = (Get-Date).AddSeconds(1)   # le temps de finir de répondre à la fenêtre
+            while ((Get-Date) -lt $fin) { if ($ecoute.Pending()) { Servir $ecoute.AcceptTcpClient() $script:modeInstallation } else { Start-Sleep -Milliseconds 40 } }
+            $ecoute.Stop()
             if ($script:serveur -and -not $script:serveur.HasExited) { Stop-Process -Id $script:serveur.Id -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1 }
-            [void](Demarrer-Moteur $false)
+            Essayer-Moteur $false
+            $ecoute = $script:ecoute
         }
 
         # Fenêtre fermée : on arrête tout.
