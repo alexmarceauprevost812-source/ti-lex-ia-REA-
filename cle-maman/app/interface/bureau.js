@@ -13,6 +13,7 @@
     { vue: "calcul", icone: "🧮", nom: "Calculatrice", sous: "Avec TPS et TVQ", couleur: "#0f7b0f" },
     { vue: "notes", icone: "📝", nom: "Bloc-notes", sous: "Notes et brouillons", couleur: "#6b3fa0" },
     { vue: "affiche", icone: "🖼️", nom: "Affiches", sous: "Publicités pour le magasin", couleur: "#b3121b" },
+    { vue: "modeles", icone: "🧠", nom: "Modèles IA", sous: "Choisir et installer l'IA", couleur: "#00897b" },
     { vue: "guide", icone: "📖", nom: "Guide", sous: "Comment ça marche", couleur: "#00838f" },
     { vue: "corbeille", image: "img/corbeille.png", icone: "🗑️", nom: "Corbeille", sous: "Fichiers supprimés", couleur: "#4a6a8a" },
     { vue: "reglages", image: "img/reglages.png", icone: "⚙️", nom: "Réglages", sous: "Thème, couleurs, voix", couleur: "#5f5f5f" },
@@ -32,6 +33,7 @@
     if (vue === "notes") notes.afficher();
     if (vue === "calcul") setTimeout(() => $("calcEcran").focus(), 30);
     if (vue === "alex") alex.afficher();
+    if (vue === "modeles") modeles.afficher();
     $("boutonAlex").classList.toggle("actif", vue === "alex");
     if (vue === "assistante") setTimeout(() => $("message").focus(), 30);
   }
@@ -422,6 +424,11 @@
       "Le <strong>bureau</strong> montre tes applications. Clique sur une grosse icône pour l'ouvrir.",
       "La <strong>barre du bas</strong> fonctionne comme dans Windows : clique sur une icône pour passer d'une appli à l'autre, et sur le petit logo à gauche pour revenir au bureau.",
     ] },
+    { icone: "🧠", titre: "Installer ou changer l'intelligence artificielle", vue: "modeles", etapes: [
+      "La première fois, l'appli <strong>Modèles IA</strong> s'ouvre toute seule : elle a regardé ton ordinateur et te conseille un modèle <strong>✅ Recommandé</strong>.",
+      "Clique sur <strong>Installer</strong> et garde la fenêtre ouverte : une barre montre l'avancement. Il faut internet une seule fois.",
+      "Plus tard, tu peux installer un autre modèle et cliquer sur <strong>Utiliser ce modèle</strong> pour changer.",
+    ] },
     { icone: "💬", titre: "Parler à l'assistante", vue: "assistante", etapes: [
       "Écris ta demande en bas, comme un texto à une collègue, puis appuie sur <strong>Entrée</strong>.",
       "Les boutons de l'accueil te donnent des idées : courriel à un client, rappel de paiement, corriger un texte…",
@@ -461,7 +468,7 @@
       "Coche <strong>Lire les réponses à voix haute</strong> pour tout entendre. <strong>A− / A+</strong> dans l'assistante change la grosseur du texte.",
     ] },
     { icone: "🛟", titre: "Si quelque chose ne marche pas", vue: null, etapes: [
-      "Ferme la fenêtre, puis double-clique de nouveau sur <strong>Démarrer l'assistante</strong> sur la clé.",
+      "Ferme la fenêtre, puis double-clique de nouveau sur <strong>▶️ START</strong> sur la clé.",
       "Si ça continue : redémarre l'ordinateur et réessaie.",
       "Avant de retirer la clé, <strong>ferme la fenêtre</strong> et attends quelques secondes.",
       "Et sinon… appelle Alex ! 😊",
@@ -486,6 +493,157 @@
   afficherGuide();
   $("guideFini").onclick = () => { try { localStorage.setItem("guide-vu", "1"); } catch {} ouvrir("bureau"); };
 
+  // ------------------------------------------------------------ Modèles IA
+  // Le service local (lanceur PowerShell) lit l'ordinateur, liste les modèles
+  // installés, installe et active un modèle. Première fois : il sert aussi la
+  // page (même adresse). Ensuite : il écoute à côté du moteur, port 8766.
+  let SERVICE = "http://127.0.0.1:8766";
+  const service = async (chemin, options) => {
+    const r = await fetch(SERVICE + "/service/" + chemin, Object.assign({ cache: "no-store" }, options));
+    if (!r.ok) throw new Error("Service indisponible (" + r.status + ")");
+    return r.json();
+  };
+  const modeles = {
+    catalogue: [], machine: null, liste: null, etat: null, minuterie: null, finVue: false,
+    async charger() {
+      if (!this.catalogue.length) this.catalogue = (await (await fetch("modeles.json", { cache: "no-store" })).json()).modeles;
+      try { this.machine = await service("machine"); } catch { this.machine = null; }
+      try { this.liste = await service("modeles"); } catch { this.liste = null; }
+      try { this.etat = await service("installation"); } catch { this.etat = null; }
+    },
+    compat(m) {
+      const mc = this.machine;
+      const installe = this.liste && this.liste.installes.includes(m.id);
+      if (!mc || !mc.ram_go) return { niveau: "inconnu", texte: "Je n'ai pas pu lire l'ordinateur" };
+      if (!installe && mc.espace_go && mc.espace_go < m.taille_go + 0.6) return { niveau: "non", texte: `Pas assez d'espace sur la clé (il faut ${Math.ceil(m.taille_go + 0.6)} Go)` };
+      if (mc.ram_go < m.ram_min * 0.85) return { niveau: "non", texte: "Trop gros pour cet ordinateur" };
+      if (mc.ram_go >= m.ram_confort || (m.vram_conseillee > 0 && mc.vram_go >= m.vram_conseillee && mc.ram_go >= m.ram_min)) return { niveau: "ok", texte: "Parfait pour cet ordinateur" };
+      return { niveau: "lent", texte: "Va fonctionner, mais lentement" };
+    },
+    recommande() {
+      const ok = this.catalogue.filter((m) => this.compat(m).niveau === "ok");
+      return (ok[ok.length - 1] || this.catalogue.find((m) => this.compat(m).niveau === "lent") || this.catalogue[0] || {}).id;
+    },
+    async afficher() {
+      await this.charger();
+      this.dessiner();
+      this.suivre();
+    },
+    dessiner() {
+      const mc = this.machine;
+      $("machineInfos").innerHTML = mc ? [
+        ["🧠 Mémoire", mc.ram_go ? `${String(mc.ram_go).replace(".", ",")} Go` : "inconnue"],
+        ["🎮 Carte graphique", mc.gpu ? `${M.echapper(mc.gpu)} (${String(mc.vram_go).replace(".", ",")} Go)` : "aucune carte dédiée"],
+        ["⚙️ Processeur", `${M.echapper(mc.processeur || "?")}${mc.coeurs ? ` — ${mc.coeurs} cœurs` : ""}`],
+        ["💾 Espace libre sur la clé", mc.espace_go ? `${String(mc.espace_go).replace(".", ",")} Go` : "?"],
+      ].map(([t, v]) => `<div><span class="petit">${t}</span><strong>${v}</strong></div>`).join("")
+        : `<span class="petit">Le moteur de lecture du PC ne répond pas. Ferme la fenêtre et relance « ▶️ START ».</span>`;
+      const aucun = !this.liste || !this.liste.installes.length;
+      $("modelesIntro").classList.toggle("cache", !aucun);
+      const enCours = this.etat && this.etat.etat === "encours";
+      const reco = this.recommande();
+      const z = $("cartesModeles");
+      z.innerHTML = "";
+      for (const m of this.catalogue) {
+        const c = this.compat(m);
+        const installe = this.liste && this.liste.installes.includes(m.id);
+        const actif = this.liste && this.liste.actif === m.id;
+        const carte = document.createElement("article");
+        carte.className = "carte-modele" + (actif ? " actif" : "") + (m.id === reco && !installe ? " reco" : "");
+        const badge = { ok: "✅", lent: "⚠️", non: "❌", inconnu: "❔" }[c.niveau];
+        carte.innerHTML = `
+          ${m.id === reco ? `<div class="ruban">✅ Recommandé</div>` : ""}
+          <h3>${M.echapper(m.nom)}</h3>
+          <div class="petit">${M.echapper(m.famille)} · environ ${String(m.taille_go).replace(".", ",")} Go</div>
+          <p>${M.echapper(m.description)}</p>
+          <div class="compat compat-${c.niveau}">${badge} ${M.echapper(c.texte)}</div>
+          <div class="etat-modele">${actif ? "🟢 Utilisé en ce moment" : installe ? "💾 Installé sur la clé" : ""}</div>
+          <div class="alex-boutons"></div>`;
+        const zb = carte.querySelector(".alex-boutons");
+        if (!installe) {
+          const b = document.createElement("button");
+          b.className = "bouton " + (m.id === reco ? "principal" : "");
+          b.textContent = "⬇️ Installer";
+          b.disabled = enCours || c.niveau === "non";
+          if (c.niveau === "lent") b.title = "Il va fonctionner, mais lentement sur cet ordinateur.";
+          b.onclick = () => this.installer(m, c);
+          zb.appendChild(b);
+        } else if (!actif) {
+          const b = document.createElement("button");
+          b.className = "bouton principal";
+          b.textContent = "Utiliser ce modèle";
+          b.disabled = enCours;
+          b.onclick = () => this.activer(m);
+          zb.appendChild(b);
+        }
+        z.appendChild(carte);
+      }
+      this.dessinerEtat();
+    },
+    dessinerEtat() {
+      const e = this.etat;
+      const zone = $("installation");
+      if (!e || e.etat === "attente") { if (!this.finVue) zone.classList.add("cache"); return; }
+      zone.classList.remove("cache");
+      const titres = { encours: "⏳ Installation en cours", fini: "✅ C'est installé !", erreur: "⚠️ L'installation n'a pas fonctionné" };
+      $("instTitre").textContent = titres[e.etat] || "Installation";
+      $("instMessage").textContent = e.etat === "encours" ? `Étape ${e.etape || 1} sur 4 — ${e.message || "…"}` : (e.message || "");
+      const barre = $("instBarre");
+      barre.classList.toggle("indetermine", e.etat === "encours" && e.pourcent == null);
+      barre.style.width = e.etat === "fini" ? "100%" : e.pourcent != null ? e.pourcent + "%" : "35%";
+      $("instDetail").textContent = (e.machine || "") + (e.etat === "encours" ? " — Garde la fenêtre ouverte. Tu peux continuer à utiliser le reste du bureau." : "");
+    },
+    suivre() {
+      clearInterval(this.minuterie);
+      this.minuterie = setInterval(async () => {
+        try { this.etat = await service("installation"); } catch { /* le service redémarre (passage au moteur) */ }
+        this.dessinerEtat();
+        if (this.etat && this.etat.etat === "fini") this.quandFini();
+        else if (!this.etat || this.etat.etat !== "encours") { if (vueActive !== "modeles") clearInterval(this.minuterie); }
+      }, 1000);
+    },
+    async installer(m, c) {
+      if (c.niveau === "lent" && !confirm(`« ${m.nom} » va fonctionner sur cet ordinateur, mais lentement. L'installer quand même ?`)) return;
+      if (!confirm(`Installer « ${m.nom} » (environ ${String(m.taille_go).replace(".", ",")} Go) ? Il faut internet pendant le téléchargement.`)) return;
+      try { this.etat = await service("installer?id=" + encodeURIComponent(m.id), { method: "POST" }); } catch (e) { alert(e.message); return; }
+      this.dessiner(); this.suivre();
+    },
+    async activer(m) {
+      try { await service("activer?id=" + encodeURIComponent(m.id), { method: "POST" }); } catch (e) { alert(e.message); return; }
+      $("installation").classList.remove("cache");
+      $("instTitre").textContent = `🔄 Je passe à « ${m.nom} »…`;
+      $("instMessage").textContent = "L'assistante se réveille avec son nouveau cerveau (de 20 secondes à une minute).";
+      $("instBarre").classList.add("indetermine"); $("instBarre").style.width = "35%";
+      this.attendreMoteur();
+    },
+    async quandFini() {
+      if (this.finVue) return;
+      this.finVue = true;
+      clearInterval(this.minuterie);
+      $("instMessage").textContent = "L'assistante se réveille… (de 20 secondes à une minute)";
+      this.attendreMoteur();
+    },
+    attendreMoteur() {
+      const essai = async () => {
+        try {
+          const r = await fetch("/health", { cache: "no-store" });
+          if (r.ok) {
+            SERVICE = "http://127.0.0.1:8766";
+            $("instTitre").textContent = "✅ C'est prêt !";
+            $("instMessage").textContent = "Ton assistante est prête à travailler.";
+            $("instBarre").classList.remove("indetermine"); $("instBarre").style.width = "100%";
+            $("instAller").classList.remove("cache");
+            setTimeout(() => { this.finVue = false; this.charger().then(() => this.dessiner()); }, 1500);
+            return;
+          }
+        } catch {}
+        setTimeout(essai, 2000);
+      };
+      setTimeout(essai, 2000);
+    },
+  };
+  $("instAller").onclick = () => ouvrir("assistante");
+
   // ----------------------------------------------------------- Espace Alex
   const VERSION = "1.0 — octobre 2026";
   const alex = {
@@ -501,7 +659,7 @@
         z.innerHTML = h.ok
           ? `<div>🟢 <strong>En marche</strong></div><div>Modèle : <code>${M.echapper(modele)}</code></div><div>Contexte : ${ctx} jetons · Vision : ${vision}</div>`
           : `<div>🟡 Le moteur se réveille (code ${h.status})</div>`;
-      } catch { z.innerHTML = "<div>🔴 Moteur arrêté — relancer « Démarrer l'assistante »</div>"; }
+      } catch { z.innerHTML = "<div>🔴 Moteur arrêté — relancer « ▶️ START »</div>"; }
     },
     afficher() {
       const a = A.avance();
@@ -559,4 +717,11 @@
   try { dejaVu = localStorage.getItem("guide-vu") === "1"; } catch {}
   ouvrir(dejaVu ? "bureau" : "guide");
   if (!dejaVu) try { localStorage.setItem("guide-vu", "1"); } catch {}
+  // Première fois (pas encore d'IA) : la page est servie par le service local
+  // lui-même -> on lui parle à la même adresse et on ouvre « Modèles IA ».
+  fetch("/service/modeles", { cache: "no-store" }).then((r) => {
+    if (!r.ok) return;
+    SERVICE = "";
+    return r.json().then((l) => { if (!l.installes.length) ouvrir("modeles"); });
+  }).catch(() => {});
 })();

@@ -2,22 +2,25 @@
 ==============================
 
 POUR COMMENCER
-  1. Branche la clé dans l'ordinateur.
-  2. Ouvre la clé dans l'Explorateur de fichiers (elle s'appelle
-     « Assistante de Michelle », avec le logo bleu).
-  3. Double-clique sur « Mon assistante » (ou « Démarrer l'assistante »).
-  4. Attends que la fenêtre s'ouvre (de 20 secondes à une minute).
-  5. Ton bureau apparaît, comme sur un ordinateur : clique sur une icône.
-     Le Guide 📖 explique tout, étape par étape.
+  1. Branche la clé dans l'ordinateur et ouvre-la dans l'Explorateur de
+     fichiers (elle s'appelle « Assistante de Michelle », avec le logo bleu).
+  2. Double-clique sur « ▶️ START » (ou sur « Mon assistante »).
+  3. Ton mini-ordinateur s'ouvre, comme un bureau Windows.
 
-La toute première fois, si l'intelligence artificielle n'est pas encore sur
-la clé, une fenêtre propose de la télécharger : réponds « Oui » (il faut
-internet une seule fois, de 10 à 40 minutes). Ensuite, plus besoin d'internet.
+LA TOUTE PREMIÈRE FOIS
+  L'appli « 🧠 Modèles IA » s'ouvre toute seule. Elle a regardé ton
+  ordinateur et te conseille un modèle (marqué ✅ Recommandé).
+  Clique sur « Installer » et laisse la fenêtre ouverte (il faut internet,
+  de 10 à 40 minutes). Quand c'est prêt, c'est écrit « C'est prêt ! ».
+  Ensuite, plus besoin d'internet. Aucune fenêtre noire, rien à taper.
+
+  Plus tard, dans « 🧠 Modèles IA », tu peux installer un autre modèle
+  (plus rapide ou plus intelligent) et changer de modèle d'un clic.
 
 TON MINI-ORDINATEUR
   Bureau avec icônes, menu Démarrer et barre des tâches, comme Windows.
   Applis : Assistante, Mes documents, Calculatrice (TPS/TVQ), Bloc-notes,
-  Affiches, Guide, Corbeille, Réglages (thème clair/sombre/automatique,
+  Affiches, Modèles IA, Guide, Corbeille, Réglages (thème clair/sombre/automatique,
   couleur, fond d'écran, voix).
 
 CE QUE L'ASSISTANTE SAIT FAIRE
@@ -52,7 +55,7 @@ POUR FERMER
   Avant de retirer la clé, ferme la fenêtre et attends quelques secondes.
 
 UN PROBLÈME ?
-  Ferme la fenêtre et double-clique de nouveau sur « Démarrer l'assistante ».
+  Ferme la fenêtre et double-clique de nouveau sur « ▶️ START ».
   Si ça ne marche toujours pas, redémarre l'ordinateur, puis appelle Alex.
 
 Fait avec amour par Alex — Produit du Québec.

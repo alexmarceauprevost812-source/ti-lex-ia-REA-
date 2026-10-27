@@ -634,7 +634,7 @@
     if (!r.ok) {
       let detail = "";
       try { detail = (await r.json()).error?.message || ""; } catch {}
-      throw new Error(r.status === 503 ? "L'assistante finit de se réveiller, réessaie dans quelques secondes." : `Le moteur a répondu une erreur (${r.status}). ${detail}`);
+      throw new Error(r.status === 503 ? "L'assistante n'est pas encore prête (installation de l'IA ou réveil en cours). Va voir l'appli « 🧠 Modèles IA » sur le bureau." : `Le moteur a répondu une erreur (${r.status}). ${detail}`);
     }
     const lecteur = r.body.getReader();
     const dec = new TextDecoder();
@@ -777,9 +777,14 @@
     try {
       const r = await fetch("/health", { cache: "no-store" });
       if (r.ok) { $("bandeau").classList.add("cache"); return true; }
-      bandeau("L'assistante finit de se réveiller… encore quelques secondes.");
+      let info = {};
+      try { info = await r.json(); } catch {}
+      if (info.status === "installation") {
+        bandeau("Il manque une étape : installer l'intelligence artificielle de ton mini-ordinateur.",
+          { texte: "🧠 Choisir mon IA", action: () => window.ouvrirAppli && window.ouvrirAppli("modeles") });
+      } else bandeau("L'assistante finit de se réveiller… encore quelques secondes.");
     } catch {
-      bandeau("L'assistante ne répond plus. Ferme cette fenêtre et double-clique de nouveau sur « Démarrer l'assistante ».");
+      bandeau("L'assistante ne répond plus. Ferme cette fenêtre et double-clique de nouveau sur « ▶️ START ».");
     }
     setTimeout(verifierMoteur, 4000);
     return false;
