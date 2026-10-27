@@ -120,6 +120,21 @@ TOOL_SCHEMAS: list[dict] = [
             "path": {"type": "string"}, "content": {"type": "string"}},
             "required": ["path", "content"]}}},
     {"type": "function", "function": {
+        "name": "draw_diagram",
+        "description": ("Dessine un schéma (organigramme, plan de projet, étapes, architecture) à partir "
+                        "de code Mermaid. Crée une page .html à ouvrir dans le navigateur (et un .png si "
+                        "possible) dans le dossier schemas/. Exemple de code : "
+                        "'flowchart TD\\n  A[Idée] --> B[Code]\\n  B --> C[Test]'."),
+        "parameters": {"type": "object", "properties": {
+            "code": {"type": "string", "description": "Le diagramme en Mermaid (commence par flowchart TD, sequenceDiagram, mindmap…)"},
+            "name": {"type": "string", "description": "Nom court du fichier, sans extension (ex : plan-projet)"},
+            "title": {"type": "string", "description": "Titre affiché au-dessus du schéma"},
+        }, "required": ["code"]}}},
+    {"type": "function", "function": {
+        "name": "machine_info",
+        "description": "Dit quelle est la puissance de l'ordinateur (niveau fort, moyen ou léger) pour savoir quels moteurs sont utilisables.",
+        "parameters": {"type": "object", "properties": {}}}},
+    {"type": "function", "function": {
         "name": "run_command",
         "description": "Lance une commande dans le dossier du projet (ex: python main.py, pytest). Demande la confirmation de l'utilisateur.",
         "parameters": {"type": "object", "properties": {
@@ -243,6 +258,43 @@ class Toolbox:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
         return f"Écrit : {path} ({len(content)} caractères)"
+
+    # --------------------------------------------------------------- moteurs
+    def tool_draw_diagram(self, code: str, name: str = "schema", title: str | None = None) -> str:
+        from .schema import SchemaError, dessiner, nom_sur
+
+        nom = nom_sur(name)
+        # On NE résout PAS la base : dessiner() écrit base.with_suffix(...), et
+        # ce sont exactement ces chemins-là qu'on vérifie un par un (un lien
+        # symbolique sur le dossier ou sur un fichier vers l'extérieur est refusé).
+        base = self.config.workspace.resolve() / "schemas" / nom
+        sorties = [self._resolve(str(base.with_suffix(ext).relative_to(self.config.workspace.resolve())))
+                   for ext in (".mmd", ".html", ".png")]
+        existants = [p for p in sorties if p.exists()]
+        if existants and not self.confirm(
+                f"Remplacer le schéma existant « schemas/{nom} » "
+                f"({', '.join(p.suffix for p in existants)}) ?"):
+            raise ToolError("L'utilisateur a refusé de remplacer ce schéma.")
+        try:
+            crees = dessiner(code, base, self.config.moteurs, title)
+        except SchemaError as e:
+            raise ToolError(str(e)) from e
+        root = self.config.workspace.resolve()
+        liste = ", ".join(str(p.relative_to(root)) for p in crees)
+        conseil = "" if any(p.suffix == ".png" for p in crees) else (
+            " (Pas d'image .png : mermaid-cli n'est pas installé. Ouvre la page .html dans le navigateur.)")
+        return f"Schéma créé : {liste}.{conseil}"
+
+    def tool_machine_info(self) -> str:
+        from .hardware import detecter
+
+        m = detecter()
+        moteurs = {
+            "fort": "schémas ; images rapides ; vraie génération vidéo courte",
+            "moyen": "schémas ; images (plus lentes) ; vidéo montée à partir d'images",
+            "leger": "schémas ; petites images sur le processeur (lent) ; vidéo montée à partir d'images",
+        }[m.niveau]
+        return f"{m.resume()}\nMoteurs adaptés à ce niveau : {moteurs}."
 
     # -------------------------------------------------------------- commandes
     def tool_run_command(self, command: str) -> str:
