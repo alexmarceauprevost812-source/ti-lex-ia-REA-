@@ -47,6 +47,17 @@ OÙ SONT MES FICHIERS ?
   clé. Ouvre-le dans l'Explorateur comme n'importe quel dossier : tu peux
   copier-coller des fichiers entre la clé et l'ordinateur comme d'habitude.
 
+MOT DE PASSE
+  Dans Réglages, section « 🔒 Mot de passe », clique sur « Créer ». Ensuite,
+  ton mini-ordinateur s'ouvre sur un écran verrouillé, comme Windows.
+  Tu peux le faire verrouiller tout seul après 5, 15, 30 minutes ou 1 heure
+  sans t'en servir, ou cliquer sur « 🔒 Verrouiller » dans le menu Démarrer.
+  Ajoute un indice : il s'affiche si tu cliques « J'ai oublié mon mot de passe ».
+  Le mot de passe protège l'assistante, tes conversations et tes notes. Les
+  fichiers de « Mes documents » restent des fichiers ordinaires sur la clé.
+  (Pour Alex : en cas d'oubli, effacer le dossier app\profil remet tout à
+  zéro — conversations, notes et réglages — sans toucher à Mes documents.)
+
 C'EST PRIVÉ
   L'assistante fonctionne entièrement sur l'ordinateur, sans internet.
   Rien de ce que tu écris n'est envoyé ailleurs. Personne d'autre ne le lit.

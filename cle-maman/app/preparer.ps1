@@ -130,7 +130,12 @@ try {
 
     $dossierModele = Join-Path $modeles $choisi.id
     $dejaLa = Test-Path (Join-Path $dossierModele 'installe.ok')
-    $besoin = [math]::Ceiling($choisi.taille_go + 0.6)
+    # Ce qui est déjà téléchargé (reprise après une coupure) ne compte plus.
+    $dejaGo = 0
+    if (Test-Path $dossierModele) {
+        $dejaGo = ((Get-ChildItem $dossierModele -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum) / 1GB
+    }
+    $besoin = [math]::Ceiling([math]::Max(0, $choisi.taille_go - $dejaGo) + 0.6)
     if (-not $dejaLa -and $espaceGo -lt $besoin) { throw "Pas assez d'espace sur la clé : il faut environ $besoin Go libres (il en reste $espaceGo)." }
 
     # ---------------------------------------------------------- le moteur

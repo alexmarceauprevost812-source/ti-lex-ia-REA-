@@ -466,6 +466,7 @@
       "Choisis ta <strong>couleur</strong> et ton <strong>fond d'écran</strong>.",
       "Ajoute ta <strong>signature</strong> de courriel et les <strong>coordonnées</strong> du magasin : l'assistante s'en servira.",
       "Coche <strong>Lire les réponses à voix haute</strong> pour tout entendre. <strong>A− / A+</strong> dans l'assistante change la grosseur du texte.",
+      "<strong>🔒 Mot de passe</strong> : crée un mot de passe et ton mini-ordinateur s'ouvrira sur un écran verrouillé, comme Windows. Le menu Démarrer a un bouton <strong>Verrouiller</strong>.",
     ] },
     { icone: "🛟", titre: "Si quelque chose ne marche pas", vue: null, etapes: [
       "Ferme la fenêtre, puis double-clique de nouveau sur <strong>▶️ START</strong> sur la clé.",
@@ -707,7 +708,7 @@
     try { localStorage.setItem("avance", JSON.stringify(v)); alert("Réglages enregistrés ✔"); } catch { alert("Enregistrement impossible."); }
   };
   $("alexDefaut").onclick = () => { try { localStorage.removeItem("avance"); } catch {} alex.afficher(); };
-  const CLES = ["conversations", "documents", "reglages", "notes", "calc-hist", "avance", "guide-vu"];
+  const CLES = ["conversations", "documents", "reglages", "notes", "calc-hist", "avance", "guide-vu", "verrou"];
   $("alexExporter").onclick = () => {
     const data = { app: "mon-assistante", version: VERSION, date: new Date().toISOString(), donnees: {} };
     for (const k of CLES) { const v = localStorage.getItem(k); if (v !== null) data.donnees[k] = v; }

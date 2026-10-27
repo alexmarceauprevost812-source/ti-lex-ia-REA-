@@ -6,8 +6,27 @@
 <title>Mon assistante</title>
 <link rel="icon" href="icone.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
+<script>try { if (localStorage.getItem("verrou")) document.documentElement.classList.add("verrouille"); } catch (e) {}</script>
 </head>
 <body>
+<!-- ========================= ÉCRAN VERROUILLÉ ========================= -->
+<div class="ecran-verrou" id="ecranVerrou" role="dialog" aria-modal="true" aria-label="Écran verrouillé">
+  <div class="verrou-heure" id="verrouHeure"></div>
+  <div class="verrou-date" id="verrouDate"></div>
+  <form class="verrou-boite" id="verrouForm" autocomplete="off">
+    <span class="verrou-avatar" id="verrouAvatar">M</span>
+    <div class="verrou-nom" id="verrouNom">Michelle</div>
+    <div class="verrou-salut" id="verrouSalut"></div>
+    <div class="verrou-saisie">
+      <input type="password" id="verrouMdp" placeholder="Mot de passe" aria-label="Mot de passe" autocomplete="current-password">
+      <button type="submit" class="verrou-ok" id="verrouOk" aria-label="Entrer">➜</button>
+    </div>
+    <div class="verrou-message" id="verrouMessage" aria-live="polite"></div>
+    <button type="button" class="verrou-oublie" id="verrouOublie">J'ai oublié mon mot de passe</button>
+  </form>
+  <div class="verrou-pied">🔒 Tout reste dans cet ordinateur</div>
+</div>
+
 <div class="ecran">
 
 <!-- =============================== BUREAU =============================== -->
@@ -303,6 +322,7 @@
   <div class="menu-recents" id="menuRecents"></div>
   <footer class="menu-pied">
     <div class="menu-qui"><span class="avatar" id="menuAvatar">M</span><span id="menuNom">Michelle</span></div>
+    <button type="button" class="bouton fantome cache" id="menuVerrouiller" title="Verrouiller avec ton mot de passe">🔒 Verrouiller</button>
     <span class="petit">Pour éteindre : ferme la fenêtre (✕ en haut à droite)</span>
   </footer>
 </div>
@@ -369,6 +389,31 @@
         <option value="1.2">Rapide</option>
       </select>
     </label>
+    <fieldset class="groupe">
+      <legend>🔒 Mot de passe</legend>
+      <div class="ligne-dossier">
+        <div>
+          <strong id="rMdpTitre">Aucun mot de passe</strong>
+          <div class="petit" id="rMdpEtat">Ajoute un mot de passe pour que personne d'autre n'ouvre ton mini-ordinateur.</div>
+        </div>
+        <button type="button" class="bouton" id="rMdpCreer">🔑 Créer</button>
+      </div>
+      <div id="rMdpOptions" class="cache">
+        <label>Verrouiller tout seul si je ne m'en sers pas pendant
+          <select id="rMdpDelai">
+            <option value="0">Jamais (seulement à l'ouverture)</option>
+            <option value="5">5 minutes</option>
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="60">1 heure</option>
+          </select>
+        </label>
+        <div class="boutons-mdp">
+          <button type="button" class="bouton" id="rMdpVerrouiller">🔒 Verrouiller maintenant</button>
+          <button type="button" class="bouton fantome" id="rMdpEnlever">Enlever le mot de passe</button>
+        </div>
+      </div>
+    </fieldset>
     <div class="ligne-dossier">
       <div>
         <strong>Icône sur le bureau de l'ordinateur</strong>
@@ -390,6 +435,25 @@
   </form>
 </dialog>
 
+<!-- ========================= mot de passe ========================= -->
+<dialog id="dialogueMdp" class="dialogue">
+  <form method="dialog" id="formMdp">
+    <h2 id="mdpTitre">🔑 Créer un mot de passe</h2>
+    <label id="mdpAncienBloc">Mot de passe actuel <input type="password" id="mdpAncien" autocomplete="current-password"></label>
+    <label>Nouveau mot de passe <input type="password" id="mdpNouveau" autocomplete="new-password"></label>
+    <label>Encore une fois, pour être sûre <input type="password" id="mdpConfirmer" autocomplete="new-password"></label>
+    <label>Indice (facultatif, s'affiche si tu l'oublies)
+      <input id="mdpIndice" autocomplete="off" placeholder="Ex. : le nom de mon premier chien">
+    </label>
+    <label class="case"><input type="checkbox" id="mdpVoir"> Montrer ce que j'écris</label>
+    <div class="mdp-erreur" id="mdpErreur" aria-live="polite"></div>
+    <div class="actions-dialogue">
+      <button value="annuler" class="bouton fantome">Annuler</button>
+      <button type="submit" value="ok" class="bouton principal" id="mdpEnregistrer">Enregistrer</button>
+    </div>
+  </form>
+</dialog>
+
 <script src="config.js"></script>
 <script src="lib/docx.js"></script>
 <script src="lib/xlsx.full.min.js"></script>
@@ -399,5 +463,6 @@
 <script src="outils.js"></script>
 <script src="app.js"></script>
 <script src="bureau.js"></script>
+<script src="verrou.js"></script>
 </body>
 </html>

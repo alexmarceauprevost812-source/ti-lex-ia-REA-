@@ -449,12 +449,17 @@
         g.fillStyle = grad; g.fillRect(0, 0, W, H);
       }
       g.fillStyle = "#ffffff"; g.textAlign = "center"; g.shadowColor = "rgba(0,0,0,.5)"; g.shadowBlur = 8;
-      const yBase = d.image ? H - 150 : H / 2 - 40;
+      g.font = "36px Segoe UI, sans-serif";
+      const lx = lignesTexte(g, d.texte, W - 200).slice(0, 3);
+      // Avec une photo, le texte est collé en bas : on le remonte selon son
+      // nombre de lignes pour que la dernière reste dans l'image.
+      const dessous = lx.length ? 64 + (lx.length - 1) * 46 : 0;
+      const yBase = d.image ? Math.min(H - 150, H - 40 - dessous) : H / 2 - 40;
       g.font = "600 64px Segoe UI, sans-serif";
       const lt = lignesTexte(g, d.titre, W - 160);
       lt.forEach((l, i) => g.fillText(l, W / 2, yBase - (lt.length - 1 - i) * 72));
       g.font = "36px Segoe UI, sans-serif";
-      lignesTexte(g, d.texte, W - 200).slice(0, 3).forEach((l, i) => g.fillText(l, W / 2, yBase + 64 + i * 46));
+      lx.forEach((l, i) => g.fillText(l, W / 2, yBase + 64 + i * 46));
       g.shadowBlur = 0;
     };
 

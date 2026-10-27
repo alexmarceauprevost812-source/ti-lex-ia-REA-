@@ -482,3 +482,26 @@ body { display: grid; grid-template-rows: 1fr 52px; height: 100vh; overflow: hid
 .compat-inconnu { background: var(--fond); }
 .etat-modele { font-size: .85em; min-height: 1.2em; }
 .modeles-note { text-align: center; }
+
+/* ============================ écran verrouillé ============================ */
+.ecran-verrou { position: fixed; inset: 0; z-index: 9999; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,.35); background: #173f6e; background: linear-gradient(rgba(0,0,0,.28), rgba(0,0,0,.45)), var(--papier, #173f6e); }
+html.verrouille .ecran-verrou { display: flex; }
+.verrou-heure { font-size: clamp(56px, 11vw, 110px); font-weight: 600; line-height: 1; letter-spacing: -1px; }
+.verrou-date { font-size: 1.25em; margin-bottom: 4vh; }
+.verrou-date::first-letter { text-transform: uppercase; }
+.verrou-boite { display: flex; flex-direction: column; align-items: center; gap: 10px; width: min(340px, 90vw); }
+.verrou-avatar { width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center; font-size: 42px; font-weight: 600; background: rgba(255,255,255,.22); border: 2px solid rgba(255,255,255,.6); backdrop-filter: blur(6px); }
+.verrou-nom { font-size: 1.5em; font-weight: 600; }
+.verrou-salut { min-height: 1.4em; opacity: .95; text-align: center; }
+.verrou-saisie { display: flex; width: 100%; border-radius: 8px; overflow: hidden; background: rgba(255,255,255,.92); border-bottom: 2px solid var(--accent); }
+.verrou-saisie input { flex: 1; border: 0; padding: 11px 14px; font-size: 1.05em; background: transparent; color: #1a1a1a; outline: 0; min-width: 0; }
+.verrou-ok { border: 0; padding: 0 16px; font-size: 1.2em; cursor: pointer; background: var(--accent); color: #fff; }
+.verrou-ok:disabled { opacity: .5; cursor: default; }
+.verrou-message { min-height: 1.3em; text-align: center; font-size: .95em; }
+.verrou-oublie { border: 0; background: transparent; color: #fff; text-decoration: underline; cursor: pointer; font-size: .9em; opacity: .9; text-shadow: inherit; }
+.verrou-pied { position: absolute; bottom: 22px; font-size: .9em; opacity: .85; }
+.ecran-verrou.secoue .verrou-saisie { animation: secoue .35s; }
+@keyframes secoue { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+.boutons-mdp { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.mdp-erreur { color: #c42b1c; min-height: 1.2em; font-size: .9em; }
+:root[data-theme="sombre"] .mdp-erreur { color: #ff99a4; }
