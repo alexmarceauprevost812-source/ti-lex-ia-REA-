@@ -174,11 +174,17 @@ function Liste-Modeles {
     $actif = $null
     try { $actif = (Get-Content (Join-Path $modeles 'choix.json') -Raw -Encoding UTF8 | ConvertFrom-Json).actif } catch {}
     $installes = @()
+    $deja = @{}
     Get-ChildItem $modeles -Directory -ErrorAction SilentlyContinue | ForEach-Object {
         # « installe.ok » : écrit seulement quand TOUS les fichiers du modèle sont arrivés.
         if (Test-Path (Join-Path $_.FullName 'installe.ok')) { $installes += $_.Name }
+        else {
+            # Installation coupée : Go déjà téléchargés (pour le calcul d'espace).
+            $somme = (Get-ChildItem $_.FullName -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum
+            if ($somme) { $deja[$_.Name] = [math]::Round($somme / 1GB, 2) }
+        }
     }
-    return [ordered]@{ actif = $actif; installes = $installes; moteur = (Test-Path $cpu) }
+    return [ordered]@{ actif = $actif; installes = $installes; deja = $deja; moteur = (Test-Path $cpu) }
 }
 
 function Repondre($flux, $code, $type, [byte[]]$corps) {

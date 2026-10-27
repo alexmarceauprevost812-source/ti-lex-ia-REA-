@@ -516,7 +516,10 @@
       const mc = this.machine;
       const installe = this.liste && this.liste.installes.includes(m.id);
       if (!mc || !mc.ram_go) return { niveau: "inconnu", texte: "Je n'ai pas pu lire l'ordinateur" };
-      if (!installe && mc.espace_go && mc.espace_go < m.taille_go + 0.6) return { niveau: "non", texte: `Pas assez d'espace sur la clé (il faut ${Math.ceil(m.taille_go + 0.6)} Go)` };
+      // Ce qui est déjà téléchargé (installation coupée) ne compte plus.
+      const deja = (this.liste && this.liste.deja && this.liste.deja[m.id]) || 0;
+      const besoin = Math.max(0, m.taille_go - deja) + 0.6;
+      if (!installe && mc.espace_go && mc.espace_go < besoin) return { niveau: "non", texte: `Pas assez d'espace sur la clé (il faut ${Math.ceil(besoin)} Go)` };
       if (mc.ram_go < m.ram_min * 0.85) return { niveau: "non", texte: "Trop gros pour cet ordinateur" };
       if (mc.ram_go >= m.ram_confort || (m.vram_conseillee > 0 && mc.vram_go >= m.vram_conseillee && mc.ram_go >= m.ram_min)) return { niveau: "ok", texte: "Parfait pour cet ordinateur" };
       return { niveau: "lent", texte: "Va fonctionner, mais lentement" };
