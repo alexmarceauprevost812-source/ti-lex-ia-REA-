@@ -543,6 +543,7 @@
     g.drawImage(cm, 0, y0 - 10 * k, W, hauteur, (W - dw) / 2, haut + 20 * k + (libre - dh) / 2, dw, dh);
 
     // Bas : appel à l'action + coordonnées
+    g.textAlign = "center"; g.textBaseline = "alphabetic";  // même sans bandeau du haut
     g.fillStyle = th.bande; g.fillRect(0, H - bas, W, bas);
     g.fillStyle = th.accent; g.font = `800 ${54 * k}px Segoe UI, sans-serif`;
     g.fillText(String(a.appel || "Venez nous voir !").slice(0, 40), W / 2, H - bas + 85 * k);

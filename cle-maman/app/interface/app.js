@@ -605,9 +605,12 @@
 
     const messages = pourLeModele();
     let texteFinal = "";
+    let partiel = "";   // texte déjà affiché, gardé si on clique « Arrêter »
     try {
       for (let tour = 0; tour < 6; tour++) {
+        partiel = "";
         const { texte, appels } = await demander(messages, enCours.signal, (t) => {
+          partiel = t;
           vue.bulle.innerHTML = M.html(t);
           vue.bulle.lastElementChild && vue.bulle.lastElementChild.classList.add("curseur");
           defiler();
@@ -651,7 +654,7 @@
         vue.bulle.innerHTML = `<span class="ecrit curseur">Je termine</span>`;
       }
     } catch (e) {
-      if (e.name === "AbortError") texteFinal = (texteFinal || "") + "\n\n*(Arrêté.)*";
+      if (e.name === "AbortError") texteFinal = (partiel || texteFinal || "") + "\n\n*(Arrêté.)*";
       else {
         texteFinal = "Oups, je n'arrive pas à répondre : " + (e.message || e) + "\n\nSi ça continue, ferme la fenêtre et redémarre l'assistante.";
         verifierMoteur();
