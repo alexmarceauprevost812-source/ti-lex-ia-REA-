@@ -194,6 +194,8 @@ def main() -> int:
     config = Config()
     client = OllamaClient(config)
     print(BANNER)
+    from .hardware import detecter
+    print(f"{GREY}{detecter().resume()}{RESET}")
     while True:
         print(MENU)
         try:

@@ -36,6 +36,8 @@ def run_conversation(agent: Agent, config: Config, options: dict,
     programme (utilisé par launcher.py pour revenir au menu avec /menu).
     """
     quit_words = {"/quit", "/exit"} | (extra_quit or set())
+    from .hardware import detecter
+    print(detecter().resume())
     print("Écris ta demande. /aide pour voir les commandes.\n")
     while True:
         try:
