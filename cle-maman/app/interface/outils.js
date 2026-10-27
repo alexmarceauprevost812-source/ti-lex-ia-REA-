@@ -62,8 +62,14 @@
     const r = (x) => Math.round(x * 100) / 100;
     const tps = r(avant * TPS);
     const tvq = r(avant * TVQ);
+    if (inclus) {
+      // Taxes incluses : le total est fixé ; le montant avant taxes absorbe
+      // l'écart d'arrondi pour que avant + TPS + TVQ = total, au cent près.
+      const total = r(m);
+      return { avant: Math.round(total * 100 - tps * 100 - tvq * 100) / 100, tps, tvq, total };
+    }
     const base = r(avant);
-    return { avant: base, tps, tvq, total: inclus ? r(m) : r(base + tps + tvq) };
+    return { avant: base, tps, tvq, total: r(base + tps + tvq) };
   }
 
   // Transforme « 1 234,56 $ » en 1234.56 ; sinon null.
