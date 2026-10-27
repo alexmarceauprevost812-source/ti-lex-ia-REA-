@@ -596,8 +596,15 @@
     suivre() {
       clearInterval(this.minuterie);
       this.minuterie = setInterval(async () => {
+        const avant = this.etat && this.etat.etat;
         try { this.etat = await service("installation"); } catch { /* le service redémarre (passage au moteur) */ }
         this.dessinerEtat();
+        // L'installation vient de s'arrêter (erreur) : on redessine les cartes
+        // pour réactiver « Installer » / « Utiliser ce modèle » (réessayer).
+        if (avant === "encours" && this.etat && this.etat.etat === "erreur") {
+          try { this.liste = await service("modeles"); } catch {}
+          this.dessiner();
+        }
         if (this.etat && this.etat.etat === "fini") this.quandFini();
         else if (!this.etat || this.etat.etat !== "encours") { if (vueActive !== "modeles") clearInterval(this.minuterie); }
       }, 1000);
