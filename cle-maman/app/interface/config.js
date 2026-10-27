@@ -3,7 +3,7 @@
 // modifier elle-même dans « Réglages » (ce qu'elle choisit là a priorité).
 window.CONFIG_ASSISTANTE = {
   // Prénom de ta mère, pour le message d'accueil (« Bonjour Lise ! »).
-  prenom: "",
+  prenom: "Michelle",
   // Nom affiché de l'assistante, en haut de la fenêtre.
   nomAssistante: "Mon assistante",
   // Son travail, pour que l'assistante comprenne le contexte.

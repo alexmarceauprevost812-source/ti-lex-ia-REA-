@@ -117,8 +117,28 @@
     $("nomAssistante").textContent = reglages.nomAssistante || "Mon assistante";
     document.title = reglages.nomAssistante || "Mon assistante";
     const h = new Date().getHours();
-    const bonjour = h < 5 || h >= 18 ? "Bonsoir" : "Bonjour";
-    $("salutation").textContent = reglages.prenom ? `${bonjour} ${reglages.prenom} !` : `${bonjour} !`;
+    const question = h >= 18 || h < 5 ? "On termine quelque chose ensemble ?" : "Prête à travailler ?";
+    ecrireDoucement($("salutation"), (reglages.prenom ? `Salut ${reglages.prenom} ! ` : "Salut ! ") + question);
+  }
+
+  // Le message d'accueil s'écrit tout seul, lettre par lettre, comme à la main.
+  let ecritureEnCours = 0;
+  function ecrireDoucement(el, texte) {
+    if (el.dataset.texte === texte) return;
+    el.dataset.texte = texte;
+    el.setAttribute("aria-label", texte);
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) { el.textContent = texte; return; }
+    const tour = ++ecritureEnCours;
+    el.textContent = "";
+    el.classList.add("curseur");
+    let i = 0;
+    const suivant = () => {
+      if (tour !== ecritureEnCours) return;
+      el.textContent = texte.slice(0, ++i);
+      if (i < texte.length) setTimeout(suivant, /[ !?,]/.test(texte[i - 1]) ? 110 : 45);
+      else setTimeout(() => el.classList.remove("curseur"), 1200);
+    };
+    setTimeout(suivant, 350);
   }
 
   function quand(t) {
