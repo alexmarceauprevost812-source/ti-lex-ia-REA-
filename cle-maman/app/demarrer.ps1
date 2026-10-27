@@ -103,6 +103,25 @@ function Mettre-A-Jour-Raccourci($racine, $app) {
     } catch { }
 }
 
+# Icône « Mon assistante » sur le bureau Windows de l'ordinateur (sur demande,
+# bouton dans Réglages). La lettre de la clé change d'un PC à l'autre : si
+# l'icône existe déjà, on la remet à jour à chaque démarrage.
+$raccourciBureau = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Mon assistante.lnk'
+function Raccourci-Bureau-Windows($creer) {
+    if (-not $creer -and -not (Test-Path $raccourciBureau)) { return $false }
+    try {
+        $sh = New-Object -ComObject WScript.Shell
+        $lnk = $sh.CreateShortcut($raccourciBureau)
+        $lnk.TargetPath = Join-Path $racine '▶️ START.cmd'
+        $lnk.WorkingDirectory = $racine
+        $lnk.IconLocation = (Join-Path $app 'interface\icone.ico') + ',0'
+        $lnk.WindowStyle = 7
+        $lnk.Description = 'Ouvrir mon mini-ordinateur (la clé doit être branchée)'
+        $lnk.Save()
+        return $true
+    } catch { return $false }
+}
+
 # Modèle actif : modele\choix.json -> { "actif": "qwen3-vl-4b" }, fichiers
 # dans modele\<id>\. Retourne le dossier, ou $null si rien d'installé.
 function Dossier-Actif {
@@ -218,6 +237,10 @@ function Servir($client, $avecInterface) {
                 Repondre $flux 200 'application/json' (Json $script:machine); return
             }
             '/service/modeles' { Repondre $flux 200 'application/json' (Json (Liste-Modeles)); return }
+            '/service/raccourci-bureau' {
+                $ok = if ($methode -eq 'POST') { Raccourci-Bureau-Windows $true } else { Test-Path $raccourciBureau }
+                Repondre $flux 200 'application/json' (Json @{ ok = [bool]$ok; existe = (Test-Path $raccourciBureau) }); return
+            }
             '/service/installation' { Repondre $flux 200 'application/json' (Json (Etat-Installation)); return }
             '/service/installer' {
                 if ($methode -eq 'POST' -and $id) { Lancer-Installation $id }
@@ -330,6 +353,7 @@ function Demarrer-Moteur($avecEcran) {
 #  Départ
 # =====================================================================
 Mettre-A-Jour-Raccourci $racine $app
+[void](Raccourci-Bureau-Windows $false)
 
 # Déjà démarrée (double-clic une 2e fois, même pendant l'installation) :
 # on rouvre juste la fenêtre.

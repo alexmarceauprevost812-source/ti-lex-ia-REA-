@@ -644,6 +644,28 @@
   };
   $("instAller").onclick = () => ouvrir("assistante");
 
+  // Icône « Mon assistante » sur le bureau Windows de l'ordinateur
+  async function etatRaccourci() {
+    try { return await service("raccourci-bureau"); } catch { return null; }
+  }
+  async function creerRaccourci(bouton) {
+    try {
+      const r = await service("raccourci-bureau", { method: "POST" });
+      if (!r.ok) throw new Error();
+      if (bouton) { bouton.textContent = "✔ C'est fait !"; bouton.disabled = true; }
+      $("rRaccourciEtat").textContent = "✔ L'icône « Mon assistante » est sur le bureau de l'ordinateur.";
+      $("widgetRaccourci").classList.add("cache");
+    } catch { alert("Je n'ai pas pu mettre l'icône sur le bureau. Ferme la fenêtre et relance « ▶️ START »."); }
+  }
+  $("rRaccourci").onclick = () => creerRaccourci($("rRaccourci"));
+  $("widgetRaccourci").onclick = () => creerRaccourci($("widgetRaccourci"));
+  $("ouvrirReglages").addEventListener("click", async () => {
+    const e = await etatRaccourci();
+    if (e && e.existe) { $("rRaccourci").textContent = "✔ Déjà là"; $("rRaccourci").disabled = true; $("rRaccourciEtat").textContent = "✔ L'icône « Mon assistante » est sur le bureau de l'ordinateur."; }
+  });
+  // Sur le bureau du mini-ordi : on le propose tant que l'icône n'existe pas.
+  setTimeout(async () => { const e = await etatRaccourci(); if (e && !e.existe) $("widgetRaccourci").classList.remove("cache"); }, 1500);
+
   // ----------------------------------------------------------- Espace Alex
   const VERSION = "1.0 — octobre 2026";
   const alex = {
