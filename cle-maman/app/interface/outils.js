@@ -303,15 +303,20 @@
     const entete = (colonnes || []).map(String);
     const nbCol = Math.max(entete.length, ...(lignes || []).map((l) => (l || []).length), 1);
     const argentCol = new Array(nbCol).fill(false);
-    const corps = (lignes || []).map((l) => Array.from({ length: nbCol }, (_, c) => {
+    const formatsPct = {};
+    let lignesVues = 0;
+    const corps = (lignes || []).map((l) => (lignesVues++, Array.from({ length: nbCol }, (_, c) => {
       const brut = (l || [])[c];
       const n = lireNombre(brut);
       if (n !== null && /\$/.test(String(brut))) argentCol[c] = true;
+      // « 15 % » devient 0,15 : on garde l'affichage en pourcentage dans Excel.
+      const pct = String(brut ?? "").trim().match(/^-?\d+(?:[.,](\d+))?\s*%$/);
+      if (n !== null && pct) formatsPct[`${c}:${lignesVues}`] = "0" + (pct[1] ? "." + "0".repeat(Math.min(4, pct[1].length)) : "") + "%";
       // « 00123 » est un code, pas un nombre : on garde le texte (sinon Excel
       // enlèverait les zéros du début).
       const code = /^\s*-?0\d/.test(String(brut ?? ""));
       return n !== null && !code ? n : (brut ?? "");
-    }));
+    })));
     const aoa = [entete, ...corps];
     const ws = X.utils.aoa_to_sheet(aoa);
     const totaux = new Set((aTotaliser || []).map((t) => typeof t === "number" ? t : entete.findIndex((e) => e.toLowerCase() === String(t).toLowerCase())).filter((c) => c >= 0 && c < nbCol));
@@ -329,6 +334,7 @@
     for (let r = 1; r <= plage.e.r; r++) for (let c = 0; c < nbCol; c++) {
       const cell = ws[X.utils.encode_cell({ r, c })];
       if (cell && cell.t === "n" && argentCol[c]) cell.z = '# ##0.00 "$"';
+      if (cell && cell.t === "n" && formatsPct[`${c}:${r}`]) cell.z = formatsPct[`${c}:${r}`];
     }
     ws["!cols"] = Array.from({ length: nbCol }, (_, c) => ({ wch: Math.min(50, Math.max(10, ...aoa.map((l) => String(l[c] ?? "").length + 2))) }));
     const wb = X.utils.book_new();
@@ -397,7 +403,7 @@
     return out;
   }
 
-  async function creerVideo(diapos, photos, progres) {
+  async function creerVideo(diapos, photos, progres, signal) {
     const { type, ext } = formatVideo();
     const W = 1280, H = 720, FPS = 30;
     const c = document.createElement("canvas");
@@ -444,6 +450,7 @@
     await new Promise((ok) => {
       const tick = () => {
         const sec = (performance.now() - debut) / 1000;
+        if (signal && signal.aborted) return ok();   // « Arrêter » : on coupe tout de suite
         if (sec >= total) return ok();
         let acc = 0, k = 0;
         while (k < prep.length - 1 && sec >= acc + prep[k].duree) acc += prep[k++].duree;
@@ -459,6 +466,8 @@
     });
     rec.stop();
     await fini;
+    flux.getTracks().forEach((t) => t.stop());
+    if (signal && signal.aborted) throw new DOMException("Vidéo arrêtée.", "AbortError");
     return { blob: new Blob(morceaux, { type: type.split(";")[0] }), ext, duree: total };
   }
 
@@ -611,7 +620,7 @@
         return { texte: `Affiche créée : ${f.nom} (dans ${f.ou}).`, carte: { genre: "image", url: URL.createObjectURL(png), icone: "🖼️", ...f } };
       }
       case "creer_video": {
-        const v = await creerVideo(a.diapos, ctx.photos || [], ctx.progres);
+        const v = await creerVideo(a.diapos, ctx.photos || [], ctx.progres, ctx.signal);
         const f = await enregistrer(v.blob, nomPropre(a.nom_fichier || "vidéo", v.ext), a.dossier);
         return { texte: `Vidéo de ${Math.round(v.duree)} secondes créée : ${f.nom} (dans ${f.ou}).`, carte: { genre: "video", icone: "🎬", ...f } };
       }

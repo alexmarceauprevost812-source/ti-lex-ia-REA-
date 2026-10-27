@@ -100,8 +100,7 @@ function Dossier-Actif {
     try { $id = (Get-Content $choix -Raw -Encoding UTF8 | ConvertFrom-Json).actif } catch { return $null }
     if (-not $id) { return $null }
     $d = Join-Path $modeles $id
-    $m = Get-ChildItem $d -Filter *.gguf -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch 'mmproj' -and $_.Name -notmatch '\.partiel$' }
-    if ($m) { return $d } else { return $null }
+    if (Test-Path (Join-Path $d 'installe.ok')) { return $d } else { return $null }
 }
 function IA-Installee { return [bool]((Dossier-Actif) -and (Test-Path $cpu)) }
 
@@ -146,7 +145,8 @@ function Liste-Modeles {
     try { $actif = (Get-Content (Join-Path $modeles 'choix.json') -Raw -Encoding UTF8 | ConvertFrom-Json).actif } catch {}
     $installes = @()
     Get-ChildItem $modeles -Directory -ErrorAction SilentlyContinue | ForEach-Object {
-        if (Get-ChildItem $_.FullName -Filter *.gguf | Where-Object { $_.Name -notmatch 'mmproj' }) { $installes += $_.Name }
+        # « installe.ok » : écrit seulement quand TOUS les fichiers du modèle sont arrivés.
+        if (Test-Path (Join-Path $_.FullName 'installe.ok')) { $installes += $_.Name }
     }
     return [ordered]@{ actif = $actif; installes = $installes; moteur = (Test-Path $cpu) }
 }
@@ -213,7 +213,7 @@ function Servir($client, $avecInterface) {
                 Repondre $flux 200 'application/json' (Json (Etat-Installation)); return
             }
             '/service/activer' {
-                if ($methode -eq 'POST' -and $id -and (Test-Path (Join-Path $modeles $id))) {
+                if ($methode -eq 'POST' -and $id -and (Test-Path (Join-Path (Join-Path $modeles $id) 'installe.ok'))) {
                     [System.IO.File]::WriteAllText((Join-Path $modeles 'choix.json'), (@{ actif = $id } | ConvertTo-Json -Compress), (New-Object System.Text.UTF8Encoding($false)))
                     $script:activerDemande = $id
                     Repondre $flux 200 'application/json' (Json @{ ok = $true }); return

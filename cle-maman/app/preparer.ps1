@@ -129,7 +129,7 @@ try {
     Write-Host "   -> Modèle choisi : $($choisi.nom) ($taille)" -ForegroundColor Green
 
     $dossierModele = Join-Path $modeles $choisi.id
-    $dejaLa = (Test-Path $dossierModele) -and (Get-ChildItem $dossierModele -Filter *.gguf -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch 'mmproj' })
+    $dejaLa = Test-Path (Join-Path $dossierModele 'installe.ok')
     $besoin = [math]::Ceiling($choisi.taille_go + 0.6)
     if (-not $dejaLa -and $espaceGo -lt $besoin) { throw "Pas assez d'espace sur la clé : il faut environ $besoin Go libres (il en reste $espaceGo)." }
 
@@ -152,12 +152,15 @@ try {
     if (-not $principal) { throw "Ce modèle n'a pas de version légère (Q4_K_M)." }
     Telecharger "https://huggingface.co/$depot/resolve/main/$principal" (Join-Path $dossierModele (Split-Path -Leaf $principal)) 3 'du cerveau de l''assistante'
     if ($vision) { Telecharger "https://huggingface.co/$depot/resolve/main/$vision" (Join-Path $dossierModele (Split-Path -Leaf $vision)) 4 'des yeux (pour lire les photos)' }
+    # Tout est là : on le note. Sans ce fichier, le modèle n'est pas considéré
+    # comme installé (un téléchargement coupé pourra être repris).
+    Set-Content -Path (Join-Path $dossierModele 'installe.ok') -Value (Get-Date -Format s) -Encoding ASCII
 
     # Le modèle installé devient le modèle actif s'il n'y en avait pas encore.
     $choix = Join-Path $modeles 'choix.json'
     $actif = $null
     if (Test-Path $choix) { try { $actif = (Get-Content $choix -Raw -Encoding UTF8 | ConvertFrom-Json).actif } catch {} }
-    if (-not $actif -or -not (Test-Path (Join-Path $modeles $actif))) {
+    if (-not $actif -or -not (Test-Path (Join-Path (Join-Path $modeles $actif) 'installe.ok'))) {
         [System.IO.File]::WriteAllText($choix, (@{ actif = $choisi.id } | ConvertTo-Json -Compress), (New-Object System.Text.UTF8Encoding($false)))
     }
 

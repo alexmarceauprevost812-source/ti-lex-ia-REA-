@@ -696,6 +696,7 @@
         if (!appels.length) break;
         messages.push({ role: "assistant", content: texte || "", tool_calls: appels });
         for (const a of appels) {
+          if (enCours.signal.aborted) throw new DOMException("Arrêté.", "AbortError");
           let args = {};
           try { args = a.function.arguments ? JSON.parse(a.function.arguments) : {}; } catch { args = null; }
           const attente = document.createElement("div");
@@ -707,6 +708,7 @@
           try {
             if (args === null) throw new Error("Les informations reçues étaient mal formées.");
             const r = await Outils.executer(a.function.name, args, {
+              signal: enCours.signal,
               photos: photosDe(conv),
               coordonnees: reglages.coordonnees,
               progres: (p) => { const b = attente.querySelector(".progres > div"); if (b) b.style.width = Math.round(p * 100) + "%"; },
@@ -719,6 +721,7 @@
               if (r.carte.nom) noterDocument(r.carte);
             }
           } catch (e) {
+            if (e.name === "AbortError") { attente.remove(); throw e; }
             resultat = "Erreur : " + (e.message || e);
             attente.remove();
             const c = { genre: "erreur", titre: "Ça n'a pas marché", detail: e.message || String(e) };
