@@ -24,7 +24,13 @@ New-Item -ItemType Directory -Force $moteurs, $modeles | Out-Null
 # Progression lue par le bureau : étape (1 à 4), message, fichier en cours et
 # sa taille attendue (le bureau calcule le pourcentage à partir de la taille).
 $script:infoMachine = ''
+$script:etapeCourante = 1
+# Version du moteur connue bonne (fichiers Windows présents), si GitHub ne répond pas bien.
+$script:moteurDeSecours = 'b11926'
 function Ecrire-Etat($statut, $etape, $message, $fichier = '', $taille = 0) {
+    if ($etape -gt 0) { $script:etapeCourante = $etape }
+    # En cas d'erreur, on garde l'étape où ça a bloqué (pour l'afficher).
+    if ($statut -eq 'erreur') { $etape = $script:etapeCourante }
     if (-not $FichierEtat) { return }
     $o = [ordered]@{ etat = $statut; etape = $etape; message = $message; fichier = $fichier; taille = $taille; machine = $script:infoMachine }
     $json = $o | ConvertTo-Json -Compress
@@ -59,21 +65,36 @@ function Telecharger($url, $dest, $etape, $quoi, [int64]$taille = 0) {
     Move-Item -Force $tmp $dest
 }
 
-function Moteur($motif, $dossier, $etape) {
+function Moteur($suffixe, $dossier, $etape) {
+    # $suffixe : fin du nom du fichier, ex. « bin-win-cpu-x64.zip »
     $dest = Join-Path $moteurs $dossier
     if (Test-Path (Join-Path $dest 'llama-server.exe')) { Info "Moteur $dossier déjà installé."; return }
-    $rel = Invoke-RestMethod 'https://api.github.com/repos/ggml-org/llama.cpp/releases/latest' -Headers @{ 'User-Agent' = 'assistante' }
-    $asset = $rel.assets | Where-Object { $_.name -match $motif } | Select-Object -First 1
-    if (-not $asset) { throw "Moteur introuvable dans la version $($rel.tag_name) ($motif)." }
-    $zip = Join-Path $moteurs $asset.name
-    Telecharger $asset.browser_download_url $zip $etape 'du moteur' ([int64]$asset.size)
+    # On ne se fie pas à « latest » : GitHub peut y mettre une version sans les
+    # fichiers Windows (ex. v0.7.0). On prend la plus récente version publiée
+    # qui contient vraiment le fichier voulu ; sinon, une version connue bonne.
+    $url = $null; $taille = 0; $tag = ''
+    try {
+        $versions = Invoke-RestMethod 'https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=30' -Headers @{ 'User-Agent' = 'assistante' }
+        foreach ($v in $versions) {
+            if ($v.draft -or $v.prerelease) { continue }
+            $a = $v.assets | Where-Object { $_.name -like "llama-*-$suffixe" } | Select-Object -First 1
+            if ($a) { $url = $a.browser_download_url; $taille = [int64]$a.size; $tag = $v.tag_name; break }
+        }
+    } catch { Info "Liste des versions indisponible : $($_.Exception.Message)" }
+    if (-not $url) {
+        $tag = $script:moteurDeSecours
+        $url = "https://github.com/ggml-org/llama.cpp/releases/download/$tag/llama-$tag-$suffixe"
+        Info "Version de secours : $tag"
+    }
+    $zip = Join-Path $moteurs (Split-Path -Leaf $url)
+    Telecharger $url $zip $etape 'du moteur' $taille
     Ecrire-Etat 'encours' $etape 'Décompression du moteur…'
     New-Item -ItemType Directory -Force $dest | Out-Null
     Expand-Archive -Force $zip $dest
     $exe = Get-ChildItem $dest -Recurse -Filter llama-server.exe | Select-Object -First 1
     if ($exe -and $exe.DirectoryName -ne $dest) { Get-ChildItem $exe.DirectoryName | Move-Item -Destination $dest -Force }
     Remove-Item $zip -Force
-    Info "Moteur $dossier prêt (llama.cpp $($rel.tag_name))."
+    Info "Moteur $dossier prêt (llama.cpp $tag)."
 }
 
 # Raccourci « Mon assistante » avec le logo, à la racine de la clé, et clé
@@ -148,8 +169,8 @@ try {
 
     # ---------------------------------------------------------- le moteur
     Titre "2. Le moteur IA"
-    Moteur 'bin-win-cpu-x64\.zip$' 'cpu' 2                     # marche sur tous les PC
-    if ($gpu) { Moteur 'bin-win-vulkan-x64\.zip$' 'gpu' 2 }    # plus rapide avec une carte graphique
+    Moteur 'bin-win-cpu-x64.zip' 'cpu' 2                       # marche sur tous les PC
+    if ($gpu) { Moteur 'bin-win-vulkan-x64.zip' 'gpu' 2 }      # plus rapide avec une carte graphique
 
     # ---------------------------------------------------------- le modèle
     Titre "3. Le modèle (le « cerveau »)"

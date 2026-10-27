@@ -637,6 +637,9 @@
       $("instProgres").setAttribute("aria-valuenow", p != null ? String(p) : "");
       $("instPourcent").textContent = p != null && e.etat !== "erreur" ? `${p} %` : "";
       $("instChiffres").textContent = e.etat === "encours" ? this.chiffres(e) : "";
+      // Erreur : un bouton pour recommencer tout de suite (ce qui est déjà téléchargé est gardé).
+      $("instReessayer").classList.toggle("cache", !(e.etat === "erreur" && e.modele));
+      if (e.etat === "erreur") $("instConseil").classList.add("cache");
       $("instDetail").textContent = (e.machine || "") + (e.etat === "encours" ? " — Garde la fenêtre ouverte. Tu peux continuer à utiliser le reste du bureau." : "");
     },
     // « 1,2 Go sur 2,5 Go · 3,4 Mo/s · encore environ 6 min » + conseil si ça bloque.
@@ -753,6 +756,14 @@
     },
   };
   $("instAller").onclick = () => ouvrir("assistante");
+  $("instReessayer").onclick = async () => {
+    const id = modeles.etat && modeles.etat.modele;
+    if (!id) return;
+    $("instReessayer").disabled = true;
+    try { modeles.etat = await service("installer?id=" + encodeURIComponent(id), { method: "POST" }); modeles.historique = []; modeles.dessiner(); modeles.suivre(); }
+    catch (e) { alert(e.message); }
+    finally { $("instReessayer").disabled = false; }
+  };
   $("piluleInstallation").onclick = () => ouvrir("modeles");
   $("bureauAgendaBloc").onclick = () => ouvrir("agenda");
   $("bureauAgendaBloc").onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ouvrir("agenda"); } };
