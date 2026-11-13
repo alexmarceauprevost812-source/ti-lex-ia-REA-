@@ -12,7 +12,13 @@ def test_run_heretic_rejects_bad_model_name():
         run_heretic("--rm -rf /", confirm=lambda _q: True)
 
 
-def test_run_heretic_cancelled_by_user():
+def test_run_heretic_cancelled_by_user(monkeypatch):
+    # Heretic n'est pas forcément installé là où les tests tournent : on fait comme s'il l'était,
+    # pour vérifier que répondre « non » annule bien avant de lancer quoi que ce soit.
+    from ti_lex_agent import modelops
+    monkeypatch.setattr(modelops, "find_heretic", lambda: "/faux/heretic")
+    monkeypatch.setattr(modelops.subprocess, "run",
+                        lambda *a, **k: pytest.fail("Heretic ne doit pas être lancé"))
     with pytest.raises(ModelOpsError, match="Annulé"):
         run_heretic("Qwen/Qwen3-4B-Instruct-2507", confirm=lambda _q: False)
 

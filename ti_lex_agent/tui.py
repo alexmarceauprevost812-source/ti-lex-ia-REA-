@@ -1,7 +1,7 @@
-"""Interface plein écran LexOS : REA, Codex, Chat et Heretic dans la même fenêtre.
+"""Interface plein écran LexOS : REA, Codex, Chat et TerminalCodex dans la même fenêtre.
 
-Même écran pour les quatre modes ; seul le moteur change (modèle, outils,
-consigne). Le menu `lexos-ia` existe toujours.
+Même écran pour tous les modes ; seul le moteur change (modèle, outils,
+consigne). Heretic reste dans son propre menu (`lexos-ia`).
 
     lexos-tui                       # ouvre l'interface
     lexos-tui --workspace ~/projet  # choisit le dossier de travail
@@ -47,7 +47,7 @@ from . import outils
 from .agent import Agent, terminal_system_prompt
 from .config import Config
 from .launcher import (CHAT_SYSTEM, CODEX_SYSTEM, FALLBACK_CHAT, FALLBACK_CODEX,
-                       FALLBACK_REA, HERETIC_SYSTEM, _env_model, _has_model)
+                       FALLBACK_REA, _env_model, _has_model)
 from .memory import remember, with_memory
 from .ollama_client import OllamaClient, OllamaError
 from .params import DEFAULTS, describe, set_param
@@ -424,7 +424,6 @@ MENU_CHOICES = [
     ("rea", "REA", "agent complet : web, vision, fichiers, commandes"),
     ("codex", "Codex", "assistant de programmation"),
     ("chat", "Chat", "conversation générale"),
-    ("heretic", "Heretic", "chat direct, sans filtre (modèle décensuré)"),
     ("terminalcodex", "TerminalCodex", "écris ce que tu veux : l'IA lance les commandes"),
     ("outils", "Outils créés", "ta bibliothèque d'outils"),
     ("cloner", "Cloner un projet GitHub", "copie un dépôt dans ton dossier de travail"),
@@ -541,7 +540,7 @@ class SplashScreen(Screen[str]):
             yield Static("", id="splash-logo")
             yield Static(Text("LexOS Pro — ton terminal IA", style=GREY), id="splash-sub")
             yield OptionList(id="splash-menu")
-            yield Static(Text("↑↓ puis Entrée · chiffres 1-9 · Échap passe l'animation",
+            yield Static(Text("↑↓ puis Entrée · chiffres 1-8 · Échap passe l'animation",
                               style=GREY), id="splash-hint")
 
     def on_mount(self) -> None:
@@ -636,7 +635,7 @@ SKIP_DIRS = {".git", "__pycache__", ".venv", "venv", "node_modules", ".pytest_ca
 MAX_VIEW_BYTES = 300_000
 
 AIDE = """\
-Modes        Ctrl+T (suivant) · /rea · /codex · /chat · /heretic · /terminalcodex · clic
+Modes        Ctrl+T (suivant) · /rea · /codex · /chat · /terminalcodex · clic sur l'onglet
 Panneaux     Ctrl+B fichiers · Ctrl+O aperçu · /fichiers · /apercu · clic sur ✕
 Moteur       Ctrl+P ou /model (liste) · /model <nom>
 Fichiers     clic sur un fichier = ouvre l'aperçu · /ouvrir <chemin>
@@ -852,8 +851,6 @@ class LexosApp(App):
              _env_model("TILEX_CODEX_FALLBACK", FALLBACK_CODEX), CODEX_SYSTEM, False),
             ("chat", "Chat", _env_model("TILEX_CHAT_MODEL", "qwen3-vl:4b"),
              _env_model("TILEX_CHAT_FALLBACK", FALLBACK_CHAT), CHAT_SYSTEM, False),
-            ("heretic", "Heretic", _env_model("TILEX_HERETIC_MODEL", "heretic:latest"),
-             _env_model("TILEX_CHAT_FALLBACK", FALLBACK_CHAT), HERETIC_SYSTEM, False),
             # TerminalCodex : l'IA locale choisit et lance les commandes (avec ta confirmation).
             ("terminalcodex", "TerminalCodex", _env_model("TILEX_TERMINAL_MODEL", "qwen3:8b"),
              _env_model("TILEX_TERMINAL_FALLBACK", FALLBACK_REA), terminal_system_prompt(), True),
@@ -882,7 +879,6 @@ class LexosApp(App):
             "rea": "agent complet : web, vision, fichiers et commandes",
             "codex": "assistant de programmation",
             "chat": "conversation générale",
-            "heretic": "chat direct avec le modèle décensuré, sans outils",
             "terminalcodex": ("écris ce que tu veux faire, l'IA locale trouve et lance les "
                               "commandes\n(chaque commande te demande confirmation ; /auto pour "
                               "ne plus demander)"),
@@ -899,8 +895,7 @@ class LexosApp(App):
         with Horizontal(id="top"):
             yield Static(brand_text(2 * len(BRAND), False), id="brand")   # au repos, sans éclat
             yield Tabs(Tab("REA", id="rea"), Tab("Codex", id="codex"),
-                       Tab("Chat", id="chat"), Tab("Heretic", id="heretic"),
-                       Tab("TerminalCodex", id="terminalcodex"), id="tabs")
+                       Tab("Chat", id="chat"), Tab("TerminalCodex", id="terminalcodex"), id="tabs")
         with Horizontal(id="body"):
             with Vertical(id="files"):
                 with Horizontal(classes="panel-head"):
@@ -1276,8 +1271,6 @@ class LexosApp(App):
             if name != mode.model:
                 self._ui(self._swap_model, mode, name)
             if note:
-                if mode.key == "heretic":
-                    note += " Attention : ce modèle est normal, PAS décensuré."
                 self._ui(self._add_entry, mode, Entry("info", note))
         self._ui(self._refresh_status)
 
@@ -1377,7 +1370,7 @@ class LexosApp(App):
         word, _, arg = text.partition(" ")
         arg = arg.strip()
         mode = self.current
-        if word in {"/rea", "/codex", "/chat", "/heretic", "/terminalcodex"}:
+        if word in {"/rea", "/codex", "/chat", "/terminalcodex"}:
             self._go_mode(word[1:])
         elif word == "/aide":
             self._info(AIDE)

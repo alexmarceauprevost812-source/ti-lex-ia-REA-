@@ -153,12 +153,11 @@ la commande et afficherait l'ancien menu) ; une sauvegarde `.ti-lex.bak` est fai
 `ti-lex` prend `marceau-ia` pour REA et Codex et `asselin` pour Chat — changeable avec
 `TILEX_REA_MODEL`, `TILEX_CODEX_MODEL`, `TILEX_CHAT_MODEL`.)
 
-Une seule fenêtre de terminal pour REA, Codex, Chat et Heretic : **seul le moteur change** (modèle,
-outils, consigne). Heretic (`/heretic`, `TILEX_HERETIC_MODEL`, défaut `heretic:latest`) est un chat
-direct sans outils ; le menu `lexos-ia` existe toujours.
+Une seule fenêtre de terminal pour REA, Codex, Chat et TerminalCodex : **seul le moteur change**
+(modèle, outils, consigne). Heretic reste dans son propre menu `lexos-ia`, inchangé.
 
 - Thème noir : ce que tu écris en blanc, les réponses de l'IA en orange néon, le code en couleurs néon.
-- Onglets REA / Codex / Chat / Heretic (clic, `Ctrl+T`, ou `/rea` `/codex` `/chat` `/heretic`) — chaque mode garde sa
+- Onglets REA / Codex / Chat / TerminalCodex (clic, `Ctrl+T`, ou `/rea` `/codex` `/chat` `/terminalcodex`) — chaque mode garde sa
   propre conversation.
 - Panneau de fichiers à gauche (`Ctrl+B`) : un clic sur un fichier l'ouvre dans l'aperçu coloré à
   droite (`Ctrl+O`). Quand REA écrit un fichier, il apparaît dans la liste et s'ouvre tout seul.
@@ -168,8 +167,8 @@ direct sans outils ; le menu `lexos-ia` existe toujours.
   indicateur tourne avec le temps écoulé. `TILEX_SANS_ANIMATION=1 ti-lex` les coupe.
 - **Accueil animé** : au lancement, les lettres « TI-LEX » arrivent du ciel à 45° et se posent
   bien droit sur une ligne (« TI- » en blanc, « LEX » en orange néon), puis les choix du menu arrivent un par
-  un. `Échap` passe l'animation, les chiffres `1`-`9` choisissent, `/accueil` y revient.
-- **TerminalCodex** (onglet, `/terminalcodex`, choix 5 de l'accueil) : tu écris ce que tu veux en
+  un. `Échap` passe l'animation, les chiffres `1`-`8` choisissent, `/accueil` y revient.
+- **TerminalCodex** (onglet, `/terminalcodex`, choix 4 de l'accueil) : tu écris ce que tu veux en
   mots simples, l'IA locale trouve les commandes et les lance dans ton dossier de travail. Elle
   connaît les programmes installés et ta bibliothèque « Outils créés ». Chaque commande te demande
   confirmation ; `/auto` les laisse partir sans demander — sauf les commandes dangereuses (`sudo`,
