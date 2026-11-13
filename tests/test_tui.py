@@ -913,3 +913,31 @@ def test_entree_dans_programme_ia_joue_son_animation(tmp_path):
             assert not isinstance(app.screen, tui.IntroScreen)
             assert app.current.key == "programmeur" and app.focused.id == "prompt"
     run(go())
+
+
+def test_sessions_sauver_nouvelle_reprendre(tmp_path, monkeypatch):
+    monkeypatch.setenv("LEXOS_SESSIONS_DIR", str(tmp_path / "sessions"))
+
+    async def scenario():
+        app, _ = make_app(tmp_path)
+        async with app.run_test(size=(140, 40)) as pilot:
+            await pilot.pause(0.2)
+            await pilot.press("ctrl+t")            # REA -> Codex
+            await pilot.pause(0.1)
+            FakeClient.script = [{"role": "assistant", "content": CODE_REPLY}]
+            await type_and_send(pilot, "bonjour")
+            await wait_idle(app, pilot)
+            await type_and_send(pilot, "/sauver essai un")
+            await pilot.pause(0.2)
+            assert (tmp_path / "sessions" / "essai-un.json").is_file()
+            await type_and_send(pilot, "/nouvelle")
+            await pilot.pause(0.2)
+            assert "bonjour" not in [e.text for e in app.modes["codex"].transcript]
+            await type_and_send(pilot, "/reprendre essai-un")
+            await pilot.pause(0.2)
+            assert app.current.key == "codex"
+            assert "bonjour" in [e.text for e in app.modes["codex"].transcript if e.kind == "user"]
+            assert "ai" in entry_kinds(app, "codex")
+            shown = list(app.query(".entry"))
+            assert all(e.widget in shown for e in app.current.transcript)
+    run(scenario())

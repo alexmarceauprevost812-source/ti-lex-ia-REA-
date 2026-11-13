@@ -764,6 +764,7 @@ Panneaux     Ctrl+B fichiers · Ctrl+O aperçu · /fichiers · /apercu · clic s
 Moteur       Ctrl+P ou /model (liste) · /model <nom>
 Fichiers     clic sur un fichier = ouvre l'aperçu · /ouvrir <chemin>
 Conversation Ctrl+N ou /reset · Échap arrête la réponse · /retenir <texte>
+Sessions     /sessions (liste) · /reprendre <n° ou nom> · /sauver [nom] · /nouvelle
 Outils créés F2 ou /outils (liste) · /outil <nom> (lancer)
              /ajouter-outil <nom> = <commande> · /retirer-outil <nom>
 Projets      /cloner <proprio/depot ou adresse> [dossier] · /nouveau <nom>
@@ -1519,6 +1520,138 @@ class LexosApp(App):
             self._stop.set()
             self._set_activity("arrêt demandé…")
 
+    def exit(self, *args, **kwargs):
+        # sauvegarde automatique de la conversation en quittant
+        try:
+            self._sauver_session(auto=True)
+        except Exception:
+            pass
+        return super().exit(*args, **kwargs)
+
+    # ------------------------------------------------------------------ sessions
+    def _dossier_sessions(self):
+        from pathlib import Path as _Chemin
+        base = os.environ.get("LEXOS_SESSIONS_DIR")
+        dossier = _Chemin(base) if base else _Chemin.home() / ".local" / "share" / "lexos" / "sessions"
+        dossier.mkdir(parents=True, exist_ok=True)
+        return dossier
+
+    def _liste_sessions(self):
+        fichiers = self._dossier_sessions().glob("*.json")
+        return sorted(fichiers, key=lambda f: f.stat().st_mtime, reverse=True)[:15]
+
+    def _nom_session(self, brut):
+        import re
+        return re.sub(r"[^\w\-]+", "-", brut.strip().lower()).strip("-")[:40]
+
+    def _session_vide(self):
+        return not any(e.kind in ("user", "ai") for m in self.modes.values() for e in m.transcript)
+
+    def _sauver_session(self, nom="", auto=False):
+        import datetime
+        import json
+        if auto and os.environ.get("PYTEST_CURRENT_TEST") and not os.environ.get("LEXOS_SESSIONS_DIR"):
+            return None
+        if self._session_vide():
+            return None
+        maintenant = datetime.datetime.now()
+        if auto:
+            if not getattr(self, "_nom_auto", None):
+                self._nom_auto = f"auto-{maintenant:%Y-%m-%d_%H%M}"
+            nom = self._nom_auto
+        else:
+            nom = self._nom_session(nom) or f"session-{maintenant:%Y-%m-%d_%H%M}"
+        premier = next((e.text for m in self.modes.values() for e in m.transcript if e.kind == "user"), "")
+        data = {"version": 1, "nom": nom, "date": maintenant.isoformat(timespec="seconds"),
+                "courant": self.current.key, "resume": premier[:80], "modes": {}}
+        for cle, m in self.modes.items():
+            data["modes"][cle] = {
+                "transcript": [{"kind": e.kind, "text": e.text, "label": e.label, "detail": e.detail}
+                               for e in m.transcript],
+                "messages": list(m.messages),
+                "agent_messages": list(m.agent.messages) if m.agent else None,
+            }
+        chemin = self._dossier_sessions() / f"{nom}.json"
+        chemin.write_text(json.dumps(data, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+        return nom
+
+    def _commande_session(self, word, arg):
+        import json
+        if self.busy:
+            self._info("Impossible pendant une réponse — Échap pour l'arrêter d'abord.", "error")
+            return
+        if word == "/sessions":
+            fichiers = self._liste_sessions()
+            if not fichiers:
+                self._info("Aucune session sauvegardée. /sauver <nom> pour en créer une.")
+                return
+            lignes = ["Sessions sauvegardées (/reprendre <n° ou nom>) :"]
+            for i, f in enumerate(fichiers, 1):
+                try:
+                    d = json.loads(f.read_text(encoding="utf-8"))
+                    quand = str(d.get("date", ""))[:16].replace("T", " ")
+                    lignes.append(f"  {i}. {d.get('nom', f.stem)}  ·  {quand}  ·  {str(d.get('resume', ''))[:40]}")
+                except (OSError, ValueError):
+                    lignes.append(f"  {i}. {f.stem}  (illisible)")
+            self._info("\n".join(lignes))
+        elif word == "/sauver":
+            nom = self._sauver_session(arg)
+            if nom:
+                self._info(f"Session « {nom} » sauvegardée. /reprendre {nom} pour la retrouver.")
+            else:
+                self._info("Rien à sauvegarder : la conversation est vide.", "error")
+        elif word == "/nouvelle":
+            ancienne = self._sauver_session(auto=True)
+            for m in self.modes.values():
+                m.transcript.clear()
+                m.messages.clear()
+                if m.agent is not None:
+                    m.agent.reset()
+            self._nom_auto = None
+            self._render_transcript()
+            self._refresh_status()
+            self._info("Nouvelle session." + (f" L'ancienne est gardée : {ancienne}" if ancienne else ""))
+        elif word == "/reprendre":
+            if not arg:
+                self._info("Usage : /reprendre <n° ou nom>  (liste : /sessions)", "error")
+                return
+            fichiers = self._liste_sessions()
+            cible = None
+            if arg.isdigit() and 1 <= int(arg) <= len(fichiers):
+                cible = fichiers[int(arg) - 1]
+            else:
+                chemin = self._dossier_sessions() / f"{self._nom_session(arg)}.json"
+                if chemin.is_file():
+                    cible = chemin
+            if cible is None:
+                self._info(f"Session introuvable : {arg}  (liste : /sessions)", "error")
+                return
+            try:
+                data = json.loads(cible.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as e:
+                self._info(f"Session illisible : {e}", "error")
+                return
+            self._sauver_session(auto=True)      # garde la conversation en cours
+            for cle, saved in data.get("modes", {}).items():
+                m = self.modes.get(cle)
+                if m is None:
+                    continue
+                m.transcript = [Entry(kind=e.get("kind", "info"), text=e.get("text", ""),
+                                      label=e.get("label", ""), detail=e.get("detail", ""))
+                                for e in saved.get("transcript", [])]
+                m.messages = list(saved.get("messages") or [])
+                if m.agent is not None:
+                    if saved.get("agent_messages"):
+                        m.agent.messages[:] = saved["agent_messages"]
+                    else:
+                        m.agent.reset()
+            courant = data.get("courant")
+            if courant in self.modes:
+                self._go_mode(courant)
+            self._render_transcript()
+            self._refresh_status()
+            self._info(f"Session « {data.get('nom', cible.stem)} » reprise.")
+
     def action_new_chat(self) -> None:
         if self.busy:
             self._info("Impossible pendant une réponse — Échap pour l'arrêter d'abord.", "error")
@@ -1549,6 +1682,8 @@ class LexosApp(App):
             self.exit()
         elif word == "/reset":
             self.action_new_chat()
+        elif word in {"/sessions", "/reprendre", "/sauver", "/nouvelle"}:
+            self._commande_session(word, arg)
         elif word == "/fichiers":
             self.action_toggle_files()
         elif word == "/apercu":
