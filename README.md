@@ -191,6 +191,28 @@ Une seule fenêtre de terminal pour REA, Codex, Chat et TerminalCodex : **seul l
 - Même mémoire partagée (`/retenir`), mêmes variables `TILEX_*_MODEL`, mêmes modèles de repli que
   le menu. Écraser un fichier ou lancer une commande ouvre une fenêtre de confirmation.
 
+## ti-lex sur le téléphone (Termux)
+
+La même interface (`ti-lex` : REA, Codex, Chat, TerminalCodex, Outils créés) marche dans Termux.
+
+```bash
+pkg install git
+git clone https://github.com/alexmarceauprevost812-source/ti-lex-ia-REA-.git ~/ti-lex-ia-REA-
+cd ~/ti-lex-ia-REA- && git checkout claude/optimistic-shannon-8sjug8
+bash scripts/installer-termux.sh 192.168.0.42   # l'IP de ton PC : l'IA du PC, par le WiFi
+# ou : bash scripts/installer-termux.sh         # l'IA sur le téléphone (pkg install ollama)
+exec bash && ti-lex
+```
+
+- **IA du PC par le WiFi** (le plus puissant) : sur le PC, Ollama doit écouter le réseau
+  (`OLLAMA_HOST=0.0.0.0 ollama serve`, ou `LEXOS_OLLAMA_BIND=0.0.0.0` avec la clé USB). Le script
+  trouve tout seul le port (11435 pour la clé, 11434 sinon). Relance-le avec une autre IP si elle change.
+- **IA sur le téléphone** : `pkg install ollama`, `ollama serve` dans une autre session Termux, puis
+  un petit modèle (`ollama pull qwen3:1.7b`) : ti-lex prend tout seul ce qui est installé.
+- TerminalCodex sait qu'il est sur un téléphone : il installe avec `pkg install` (pas de `sudo`).
+- La recherche web de REA (`ddgs`) ne s'installe pas toujours sur un téléphone ; tout le reste
+  marche sans elle.
+
 ## Mémoire partagée
 
 Les 4 modes lisent et complètent le **même** fichier (`memoire-ia.md`, à côté du dossier de

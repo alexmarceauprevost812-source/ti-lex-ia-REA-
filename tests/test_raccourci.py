@@ -80,3 +80,48 @@ def test_install_removes_old_ti_lex_alias_that_would_hide_the_command(tmp_path):
     assert "alias ti-lex" not in texte and "alias lexos" not in texte
     assert "export A=1" in texte and "export B=2" in texte   # le reste n'est pas touché
     assert (home / ".bashrc.ti-lex.bak").is_file()
+
+
+# ------------------------------------------------------------------ Termux (téléphone)
+TERMUX = Path(__file__).resolve().parent.parent / "scripts" / "installer-termux.sh"
+
+
+def _termux(tmp_path, *args):
+    repo = tmp_path / "repo"
+    (repo / "scripts").mkdir(parents=True, exist_ok=True)
+    for script in (SCRIPT, TERMUX):
+        shutil.copy(script, repo / "scripts" / script.name)
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    fakebin = tmp_path / "bin"
+    fakebin.mkdir(exist_ok=True)
+    (fakebin / "pkg").write_text('#!/usr/bin/env bash\necho "$*" >> "$HOME/pkg.log"\n')
+    (fakebin / "curl").write_text("#!/usr/bin/env bash\nexit 7\n")      # le PC ne répond pas
+    for f in fakebin.iterdir():
+        f.chmod(0o755)
+    env = {**os.environ, "HOME": str(home), "PATH": f"{fakebin}:{os.environ['PATH']}",
+           "PREFIX": "/data/data/com.termux/files/usr", "TILEX_SKIP_PIP": "1",
+           "TILEX_PYTHON": shutil.which("python3")}
+    done = subprocess.run(["bash", str(repo / "scripts" / "installer-termux.sh"), *args],
+                          capture_output=True, text=True, env=env)
+    return done, home
+
+
+def test_termux_installe_les_paquets_et_le_raccourci(tmp_path):
+    done, home = _termux(tmp_path)
+    assert done.returncode == 0, done.stderr
+    assert "install -y python git curl" in (home / "pkg.log").read_text()
+    assert (home / ".local" / "bin" / "ti-lex").is_file()
+    assert (tmp_path / "repo" / ".venv" / "bin" / "python").exists()
+    assert "pkg install ollama" in done.stdout              # IA sur le téléphone : explique
+    assert "OLLAMA_HOST" not in (home / ".bashrc").read_text()
+
+
+def test_termux_avec_ip_du_pc_relancable_sans_doublon(tmp_path):
+    _termux(tmp_path, "192.168.0.42", "11434")
+    done, home = _termux(tmp_path, "192.168.0.50", "11434")  # nouvelle IP : remplace
+    assert done.returncode == 0, done.stderr
+    texte = (home / ".bashrc").read_text()
+    assert texte.count('export OLLAMA_HOST="http://192.168.0.50:11434"') == 1
+    assert "192.168.0.42" not in texte
+    assert "ne répond pas" in done.stdout
