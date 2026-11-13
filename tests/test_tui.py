@@ -846,3 +846,10 @@ def test_entree_dans_terminalcodex_une_touche_passe_l_animation(tmp_path):
             assert not isinstance(app.screen, tui.IntroScreen)
             assert app.current.key == "terminalcodex" and app.focused.id == "prompt"
     run(go())
+
+
+def test_logo_lex_en_blanc_os_en_orange_neon():
+    repos = tui.brand_text(2 * len(tui.BRAND), False)      # image sans éclat
+    assert repos.plain == "LEXOS"
+    couleurs = [str(sp.style) for sp in repos.spans]
+    assert couleurs == [f"bold {tui.WHITE}"] * 3 + [f"bold {tui.NEON_ORANGE}"] * 2

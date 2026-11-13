@@ -81,9 +81,9 @@ def spinner_frame(tick: int) -> str:
 
 
 def brand_text(tick: int, busy: bool) -> Text:
-    """Le logo LEXOS. Au repos, un éclat néon glisse doucement d'une lettre à
-    l'autre, puis fait une pause. Quand le modèle travaille, les lettres
-    changent de couleur néon."""
+    """Le logo LEXOS : « LEX » en blanc, « OS » en orange néon. Au repos, un éclat
+    néon glisse doucement d'une lettre à l'autre, puis fait une pause. Quand le
+    modèle travaille, les lettres changent de couleur néon."""
     out = Text()
     glint = (tick // 2) % (len(BRAND) + 6)
     for i, ch in enumerate(BRAND):
@@ -91,10 +91,8 @@ def brand_text(tick: int, busy: bool) -> Text:
             out.append(ch, style=f"bold {NEON_CYCLE[(tick + i) % len(NEON_CYCLE)]}")
         elif i == glint:
             out.append(ch, style=f"bold {NEON_CYAN}")
-        elif i == glint - 1:
-            out.append(ch, style=f"bold {SKY}")
         else:
-            out.append(ch, style=f"bold {WHITE}")
+            out.append(ch, style=f"bold {WHITE if i < 3 else NEON_ORANGE}")
     return out
 
 
@@ -899,7 +897,7 @@ class LexosApp(App):
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="top"):
-            yield Static(Text("LEXOS", style=f"bold {WHITE}"), id="brand")
+            yield Static(brand_text(2 * len(BRAND), False), id="brand")   # au repos, sans éclat
             yield Tabs(Tab("REA", id="rea"), Tab("Codex", id="codex"),
                        Tab("Chat", id="chat"), Tab("Heretic", id="heretic"),
                        Tab("TerminalCodex", id="terminalcodex"), id="tabs")
