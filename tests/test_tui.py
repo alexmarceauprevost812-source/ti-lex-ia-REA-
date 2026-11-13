@@ -478,3 +478,127 @@ def test_animation_runs_by_default(tmp_path):
             await pilot.pause(0.6)
             assert app._tick >= 2
     run(scenario())
+
+
+# ------------------------------------------------------------------ accueil, outils, projets
+def test_animation_les_lettres_arrivent_a_45_degres_et_le_mot_se_pose_bien_droit():
+    assert not any(ch in tui.splash_frame(0).plain for ch in "/_|")      # tout est dans le ciel
+    fin = tui.splash_frame(tui.splash_done_tick()).plain.splitlines()
+    # mot posé : même style que la bannière KALI (police « slant »), droit, tout en bas
+    assert [ligne.rstrip() for ligne in fin[-5:]] == [
+        "  __________     __    _______  __",
+        " /_  __/  _/    / /   / ____/ |/ /",
+        "  / /  / /_____/ /   / __/  |   /",
+        " / / _/ /_____/ /___/ /___ /   |",
+        "/_/ /___/    /_____/_____//_/|_|",
+    ]
+    assert all(not ligne.strip() for ligne in fin[:-5])
+    # en l'air, une lettre est décalée de SPLASH_SLIDE colonnes par ligne à descendre (45°)
+    y1, dx1 = tui.splash_letter_pos(0, 6)
+    y2, dx2 = tui.splash_letter_pos(0, 7)
+    assert (y2 - y1, dx1 - dx2) == (1, tui.SPLASH_SLIDE)
+    assert tui.splash_letter_pos(0, tui.splash_done_tick()) == (tui.SPLASH_ROWS - 5, 0)
+    # les lettres arrivent l'une après l'autre : le T est toujours plus bas que le X
+    assert tui.splash_letter_pos(0, 8)[0] > tui.splash_letter_pos(5, 8)[0]
+    # couleurs une fois posé : « TI- » en blanc (à gauche), « LEX » en orange néon (à droite)
+    pose = tui.splash_frame(tui.splash_done_tick() + 10)
+    cellules = [(sp.start, str(sp.style)) for sp in pose.spans if pose.plain[sp.start:sp.end] not in " \n"]
+    assert {c for _, c in cellules} == {f"bold {tui.WHITE}", f"bold {tui.NEON_ORANGE}"}
+    assert cellules[0][1] == f"bold {tui.WHITE}"           # le T
+    ligne = pose.plain.splitlines()
+    colonne = ligne[-5].index("____", 17)                  # début du E
+    x = [(sp.start, str(sp.style)) for sp in pose.spans if pose.plain[sp.start:sp.end] == "_"]
+    assert any(st == f"bold {tui.NEON_ORANGE}" for _, st in x)
+
+
+def test_accueil_les_choix_arrivent_un_par_un_puis_choix(tmp_path, monkeypatch):
+    monkeypatch.setattr(tui, "SPLASH_STEP", 0.005)
+    monkeypatch.setattr(tui, "MENU_STEP", 0.12)       # assez lent pour qu'on voie chaque étape
+
+    async def go():
+        app, _ = make_app(tmp_path, resolve_models=False, splash=True)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            screen = app.screen
+            assert isinstance(screen, tui.SplashScreen)
+            menu = screen.query_one("#splash-menu")
+            assert menu.option_count == 0                  # le mot tombe d'abord
+            counts = set()
+            for _ in range(600):
+                await pilot.pause(0.01)
+                counts.add(menu.option_count)
+                if menu.option_count == len(tui.MENU_CHOICES):
+                    break
+            assert menu.option_count == len(tui.MENU_CHOICES)
+            assert len(counts) > 2                         # apparus progressivement
+            await pilot.press("2")                         # Codex
+            await pilot.pause()
+            assert not isinstance(app.screen, tui.SplashScreen)
+            assert app.current.key == "codex"
+    run(go())
+
+
+def test_accueil_echap_passe_l_animation_et_cloner_prepare_la_commande(tmp_path):
+    async def go():
+        app, _ = make_app(tmp_path, resolve_models=False, splash=True)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            await pilot.press("escape")
+            await pilot.pause()
+            assert app.screen.query_one("#splash-menu").option_count == len(tui.MENU_CHOICES)
+            await pilot.press("5")
+            await pilot.pause()
+            assert app.query_one("#prompt", Input).value == "/cloner "
+    run(go())
+
+
+def test_outils_ajouter_lancer_retirer(tmp_path):
+    async def go():
+        app, ws = make_app(tmp_path, resolve_models=False)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await type_and_send(pilot, "/ajouter-outil salut = echo allo-lexos > trace.txt")
+            await type_and_send(pilot, "/outil salut")
+            for _ in range(100):
+                await pilot.pause(0.05)
+                if (ws / "trace.txt").exists():
+                    break
+            assert (ws / "trace.txt").read_text().strip() == "allo-lexos"
+            await pilot.press("f2")
+            await pilot.pause()
+            assert isinstance(app.screen, tui.ToolPicker)
+            await pilot.press("escape")
+            await type_and_send(pilot, "/retirer-outil salut")
+            await type_and_send(pilot, "/outil salut")
+            await pilot.pause()
+            assert any(e.kind == "error" and "Aucun outil" in e.text
+                       for e in app.current.transcript)
+    run(go())
+
+
+def test_nouveau_projet_et_refus(tmp_path):
+    async def go():
+        app, ws = make_app(tmp_path, resolve_models=False)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await type_and_send(pilot, "/nouveau demo")
+            await pilot.pause()
+            assert (ws / "demo" / "README.md").is_file()
+            await type_and_send(pilot, "/nouveau ../dehors")
+            await pilot.pause()
+            assert not (tmp_path / "dehors").exists()
+            assert app.current.transcript[-1].kind == "error"
+    run(go())
+
+
+def test_cloner_adresse_refusee(tmp_path):
+    async def go():
+        app, ws = make_app(tmp_path, resolve_models=False)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await type_and_send(pilot, "/cloner file:///etc")
+            for _ in range(60):
+                await pilot.pause(0.05)
+                if any(e.kind == "error" for e in app.current.transcript):
+                    break
+            assert any(e.kind == "error" and "non reconnue" in e.text
+                       for e in app.current.transcript)
+            assert list(ws.iterdir()) == []
+    run(go())

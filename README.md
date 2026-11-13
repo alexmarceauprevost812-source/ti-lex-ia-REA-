@@ -162,6 +162,15 @@ outils, consigne). Heretic reste dans le menu `lexos-ia`, inchangé.
   `Ctrl+N` efface la conversation ; `Ctrl+Q` quitte ; `/aide` liste tout.
 - Animations légères : le logo LEXOS brille en néon, et pendant que le modèle travaille un
   indicateur tourne avec le temps écoulé. `TILEX_SANS_ANIMATION=1 ti-lex` les coupe.
+- **Accueil animé** : au lancement, les lettres « TI-LEX » arrivent du ciel à 45° et se posent
+  bien droit sur une ligne (« TI- » en blanc, « LEX » en orange néon), puis les choix du menu arrivent un par
+  un. `Échap` passe l'animation, les chiffres `1`-`7` choisissent, `/accueil` y revient.
+- **Outils créés** (`F2` ou `/outils`) : ta bibliothèque d'outils de terminal.
+  `/ajouter-outil sauvegarde = bash ~/scripts/backup.sh` l'ajoute, `/outil sauvegarde` le lance
+  (l'interface se met de côté le temps que l'outil tourne, puis revient), `/retirer-outil` l'enlève.
+  La liste est dans `outils-crees.json`, à côté du dossier de travail (`TILEX_OUTILS` pour changer).
+- **Projets** : `/cloner proprio/depot` (ou une adresse `https://…`) copie un projet GitHub dans le
+  dossier de travail ; `/nouveau mon-projet` démarre un projet vide (README + `git init`).
 - Même mémoire partagée (`/retenir`), mêmes variables `TILEX_*_MODEL`, mêmes modèles de repli que
   le menu. Écraser un fichier ou lancer une commande ouvre une fenêtre de confirmation.
 

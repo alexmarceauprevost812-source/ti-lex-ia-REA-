@@ -33,14 +33,15 @@ from rich.panel import Panel
 from rich.syntax import PygmentsSyntaxTheme, Syntax
 from rich.text import Text
 from textual import on, work
-from textual.app import App, ComposeResult
+from textual.app import App, ComposeResult, SuspendNotSupported
 from textual.binding import Binding
 from textual.containers import Horizontal, ScrollableContainer, Vertical, VerticalScroll
-from textual.screen import ModalScreen
+from textual.screen import ModalScreen, Screen
 from textual.theme import Theme
 from textual.widgets import Button, DirectoryTree, Footer, Input, OptionList, Static, Tab, Tabs
 from textual.widgets.option_list import Option
 
+from . import outils
 from .agent import Agent
 from .config import Config
 from .launcher import (CHAT_SYSTEM, CODEX_SYSTEM, FALLBACK_CHAT, FALLBACK_CODEX,
@@ -253,6 +254,182 @@ def pick_model(available: list[str], primary: str, fallback: str) -> tuple[str, 
                           f"« {available[0]} », le seul disponible.")
 
 
+# --------------------------------------------------------------------------- accueil
+SPLASH_FONT = {   # police « slant » (comme la bannière KALI), une lettre = 5 lignes
+    "T": [
+        '  ______',
+        ' /_  __/',
+        '  / /',
+        ' / /',
+        '/_/',
+    ],
+    "I": [
+        '        ____',
+        '          _/',
+        '       / /',
+        '     _/ /',
+        '    /___/',
+    ],
+    "-": [
+        '',
+        '',
+        '          _____',
+        '         _____/',
+        '',
+    ],
+    "L": [
+        '                 __',
+        '                / /',
+        '               / /',
+        '                /___',
+        '             /_____/',
+    ],
+    "E": [
+        '                       ______',
+        '                      / ____/',
+        '                     / __/',
+        '                    / /___',
+        '                    _____/',
+    ],
+    "X": [
+        '                             _  __',
+        '                              |/ /',
+        '                            |   /',
+        '                           /   |',
+        '                          /_/|_|',
+    ],
+}
+SPLASH_WIDTH = 34
+SPLASH_WORD = "TI-LEX"
+SPLASH_ROWS = 12            # hauteur du « ciel » ; le mot se pose tout en bas, bien droit
+SPLASH_GAP = 3              # images d'écart entre deux lettres qui tombent
+SPLASH_SLIDE = 2            # colonnes par ligne de chute : 2 ≈ une descente à 45°
+SPLASH_STEP = 0.05          # secondes entre deux images
+MENU_STEP = 0.13            # secondes entre l'apparition de deux choix
+MENU_CHOICES = [
+    ("rea", "REA", "agent complet : web, vision, fichiers, commandes"),
+    ("codex", "Codex", "assistant de programmation"),
+    ("chat", "Chat", "conversation générale"),
+    ("outils", "Outils créés", "ta bibliothèque d'outils"),
+    ("cloner", "Cloner un projet GitHub", "copie un dépôt dans ton dossier de travail"),
+    ("nouveau", "Nouveau projet", "démarre un projet vide"),
+    ("quitter", "Quitter", ""),
+]
+
+
+def splash_letter_pos(index: int, tick: int) -> tuple[int, int]:
+    """(ligne du haut, décalage vers la droite) de la lettre `index` à l'image `tick`.
+    Une lettre descend du ciel à 45° : tant qu'elle est en l'air elle est décalée de
+    SPLASH_SLIDE colonnes par ligne qu'il lui reste à descendre. Posée : décalage 0."""
+    target = SPLASH_ROWS - 5
+    y = min(target, -5 + tick - index * SPLASH_GAP)
+    return y, (target - y) * SPLASH_SLIDE
+
+
+def splash_done_tick() -> int:
+    return SPLASH_ROWS + (len(SPLASH_WORD) - 1) * SPLASH_GAP
+
+
+def splash_frame(tick: int) -> Text:
+    """Une image de l'animation : chaque lettre arrive du ciel en diagonale (45°) et se
+    pose à sa place ; le mot fini est bien droit, sur une seule ligne."""
+    target = SPLASH_ROWS - 5
+    width = SPLASH_WIDTH + (target + 5) * SPLASH_SLIDE
+    grid: list[list[tuple[str, str]]] = [[(" ", WHITE)] * width for _ in range(SPLASH_ROWS)]
+    for i, ch in enumerate(SPLASH_WORD):
+        glyph = SPLASH_FONT[ch]
+        y, dx = splash_letter_pos(i, tick)
+        landed = y >= target
+        just = landed and (-5 + tick - i * SPLASH_GAP) - target < 3     # éclat à l'atterrissage
+        final = WHITE if i < 3 else NEON_ORANGE             # « TI- » blanc, « LEX » orange néon
+        color = (NEON_YELLOW if just else final) if landed else NEON_CYCLE[(tick + i) % len(NEON_CYCLE)]
+        for g, line in enumerate(glyph):
+            if 0 <= y + g < SPLASH_ROWS:
+                for c, cell in enumerate(line):
+                    if cell != " ":
+                        grid[y + g][dx + c] = (cell, color)
+    out = Text()
+    for r, row in enumerate(grid):
+        for cell, color in row:
+            out.append(cell, style=f"bold {color}")
+        if r < SPLASH_ROWS - 1:
+            out.append("\n")
+    return out
+
+
+class SplashScreen(Screen[str]):
+    """Accueil : « TI-LEX » tombe du ciel, puis les choix du menu arrivent un par un."""
+
+    BINDINGS = [("escape", "skip", "Passer")]
+
+    def __init__(self, animated: bool = True) -> None:
+        super().__init__()
+        self.animated = animated
+        self._tick = 0
+        self._shown = 0
+        self._timer = None
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="splash"):
+            yield Static("", id="splash-logo")
+            yield Static(Text("LexOS Pro — ton terminal IA", style=GREY), id="splash-sub")
+            yield OptionList(id="splash-menu")
+            yield Static(Text("↑↓ puis Entrée · chiffres 1-7 · Échap passe l'animation",
+                              style=GREY), id="splash-hint")
+
+    def on_mount(self) -> None:
+        if not self.animated:
+            self._finish()
+            return
+        self.query_one("#splash-logo", Static).update(splash_frame(0))
+        self._timer = self.set_interval(SPLASH_STEP, self._fall)
+
+    def _fall(self) -> None:
+        self._tick += 1
+        self.query_one("#splash-logo", Static).update(splash_frame(self._tick))
+        if self._tick >= splash_done_tick() + 3:
+            self._timer.stop()
+            self._timer = self.set_interval(MENU_STEP, self._reveal)
+
+    def _reveal(self) -> None:
+        if self._shown >= len(MENU_CHOICES):
+            self._timer.stop()
+            return
+        self._add_choice(self._shown)
+        self._shown += 1
+
+    def _add_choice(self, i: int) -> None:
+        key, label, desc = MENU_CHOICES[i]
+        line = Text.assemble((f" {i + 1}  ", f"bold {NEON_ORANGE}"), (f"{label:<26}", f"bold {WHITE}"),
+                             (desc, "#b8c0cc"))
+        menu = self.query_one("#splash-menu", OptionList)
+        menu.add_option(Option(line, id=key))
+        if i == 0:
+            menu.highlighted = 0
+            menu.focus()
+
+    def _finish(self) -> None:
+        """Saute à la fin : mot posé, tous les choix visibles."""
+        if self._timer is not None:
+            self._timer.stop()
+        self.query_one("#splash-logo", Static).update(splash_frame(splash_done_tick() + 10))
+        while self._shown < len(MENU_CHOICES):
+            self._add_choice(self._shown)
+            self._shown += 1
+
+    def action_skip(self) -> None:
+        self._finish()
+
+    def on_key(self, event) -> None:
+        if event.key.isdigit() and 1 <= int(event.key) <= len(MENU_CHOICES):
+            event.stop()
+            self.dismiss(MENU_CHOICES[int(event.key) - 1][0])
+
+    @on(OptionList.OptionSelected)
+    def _selected(self, event: OptionList.OptionSelected) -> None:
+        self.dismiss(event.option_id)
+
+
 # ----------------------------------------------------------------------------- données
 @dataclass
 class Entry:
@@ -297,6 +474,10 @@ Panneaux     Ctrl+B fichiers · Ctrl+O aperçu · /fichiers · /apercu · clic s
 Moteur       Ctrl+P ou /model (liste) · /model <nom>
 Fichiers     clic sur un fichier = ouvre l'aperçu · /ouvrir <chemin>
 Conversation Ctrl+N ou /reset · Échap arrête la réponse · /retenir <texte>
+Outils créés F2 ou /outils (liste) · /outil <nom> (lancer)
+             /ajouter-outil <nom> = <commande> · /retirer-outil <nom>
+Projets      /cloner <proprio/depot ou adresse> [dossier] · /nouveau <nom>
+Accueil      /accueil (menu de départ)
 Réglages     /params · /temp <valeur> · /param <nom> <valeur>
 Quitter      Ctrl+Q ou /quit
 Astuce       Shift + souris pour copier du texte dans le terminal"""
@@ -361,6 +542,37 @@ class ModelPicker(ModalScreen[str | None]):
         self.dismiss(None)
 
 
+class ToolPicker(ModalScreen[str | None]):
+    """Bibliothèque « Outils créés » : choisis un outil pour le lancer."""
+
+    BINDINGS = [("escape", "cancel", "Annuler")]
+
+    def __init__(self, tools: list[dict]) -> None:
+        super().__init__()
+        self.tools = tools
+
+    def compose(self) -> ComposeResult:
+        width = max(len(t["nom"]) for t in self.tools)
+        with Vertical(id="dialog"):
+            yield Static(Text("🧰 Outils créés — Entrée pour lancer", style=f"bold {SKY}"),
+                         id="dialog-q")
+            yield OptionList(*[
+                Option(Text.assemble((f"{t['nom']:<{width}}  ", f"bold {WHITE}"),
+                                     (t.get("description") or t["commande"], GREY)),
+                       id=t["nom"])
+                for t in self.tools], id="tools")
+
+    def on_mount(self) -> None:
+        self.query_one(OptionList).focus()
+
+    @on(OptionList.OptionSelected)
+    def _selected(self, event: OptionList.OptionSelected) -> None:
+        self.dismiss(event.option_id)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
 class WorkspaceTree(DirectoryTree):
     def filter_paths(self, paths):
         return [p for p in paths if p.name not in SKIP_DIRS]
@@ -406,7 +618,16 @@ class LexosApp(App):
     FooterKey {{ background: {BLACK}; }}
     FooterKey .footer-key--key {{ color: {NEON_CYAN}; background: {BLACK}; text-style: bold; }}
     FooterKey .footer-key--description {{ color: {GREY}; background: {BLACK}; }}
-    ConfirmScreen, ModelPicker {{ align: center middle; background: #000000aa; }}
+    ConfirmScreen, ModelPicker, ToolPicker {{ align: center middle; background: #000000aa; }}
+    SplashScreen {{ align: center middle; background: {BLACK}; }}
+    #splash {{ width: auto; height: auto; background: {BLACK}; }}
+    #splash-logo {{ width: auto; height: auto; background: {BLACK}; }}
+    #splash-sub {{ margin: 1 0; background: {BLACK}; }}
+    #splash-menu {{ width: 84; max-width: 100%; height: 7; max-height: 7; background: {BLACK}; }}
+    #splash-menu:focus {{ background: {BLACK}; }}
+    #splash-menu > .option-list--option-highlighted {{ background: #6b3300; color: {WHITE}; text-style: bold; }}
+    #splash-menu:focus > .option-list--option-highlighted {{ background: #6b3300; color: {WHITE}; }}
+    #splash-hint {{ margin-top: 1; background: {BLACK}; }}
     #dialog {{ width: 70; max-width: 90%; height: auto; max-height: 80%; padding: 1 2;
                background: {BLACK}; border: heavy {NEON_CYAN}; }}
     #dialog-q {{ margin-bottom: 1; }}
@@ -421,13 +642,15 @@ class LexosApp(App):
         Binding("ctrl+o", "toggle_viewer", "Aperçu", priority=True),
         Binding("ctrl+p", "pick_model", "Moteur", priority=True),
         Binding("ctrl+n", "new_chat", "Nouveau", priority=True),
+        Binding("f2", "pick_tool", "Outils", priority=True),
         Binding("escape", "stop", "Arrêter"),
         Binding("ctrl+q", "quit", "Quitter", priority=True),
     ]
 
     def __init__(self, config: Config | None = None, client_factory=OllamaClient,
-                 resolve_models: bool = True) -> None:
+                 resolve_models: bool = True, splash: bool = False) -> None:
         super().__init__()
+        self.splash = splash
         self.base_config = config or Config()
         self.client_factory = client_factory
         self.resolve_models = resolve_models
@@ -522,6 +745,96 @@ class LexosApp(App):
             self.set_interval(ANIM_STEP, self._anim_frame)
         if self.resolve_models:
             self._startup()
+        if self.splash:
+            self.action_home()
+
+    # ------------------------------------------------------------------ accueil
+    def action_home(self) -> None:
+        """Ouvre le menu de départ (animation TI-LEX puis les choix)."""
+        self.push_screen(SplashScreen(animated=self._animated), self._home_choice)
+
+    def _home_choice(self, choice: str | None) -> None:
+        prompt = self.query_one("#prompt", Input)
+        if choice in self.modes:
+            self._go_mode(choice)
+        elif choice == "outils":
+            self.action_pick_tool()
+        elif choice == "cloner":
+            prompt.value = "/cloner "
+        elif choice == "nouveau":
+            prompt.value = "/nouveau "
+        elif choice == "quitter":
+            self.action_quit()
+            return
+        prompt.focus()
+        prompt.cursor_position = len(prompt.value)
+
+    # ------------------------------------------------------------------ outils créés / projets
+    def action_pick_tool(self) -> None:
+        try:
+            tools = outils.load(self.base_config)
+        except outils.OutilError as e:
+            self._info(str(e), "error")
+            return
+        if not tools:
+            self._info(outils.describe(self.base_config))
+            return
+
+        def chosen(nom: str | None) -> None:
+            if nom:
+                self._launch_tool(nom)
+        self.push_screen(ToolPicker(tools), chosen)
+
+    def _launch_tool(self, nom: str) -> None:
+        tool = outils.find(self.base_config, nom)
+        if tool is None:
+            self._info(f"Aucun outil nommé « {nom} ». /outils pour voir la liste.", "error")
+            return
+        cmd = tool["commande"]
+        try:
+            # On rend le terminal à l'outil (il peut être interactif), puis on revient.
+            with self.suspend():
+                print(f"\n▶ {tool['nom']}  ({cmd})\n", flush=True)
+                code = os.system(f"cd {str(self.base_config.workspace)!r} && {cmd}")
+                input(f"\n[code {code >> 8 if code > 255 else code}] Entrée pour revenir à LexOS… ")
+        except SuspendNotSupported:
+            self._run_tool_captured(self.current, tool)
+            return
+        self._info(f"Outil « {tool['nom']} » terminé.")
+        self._reload_tree()
+
+    @work(thread=True, group="outil")
+    def _run_tool_captured(self, mode: Mode, tool: dict) -> None:
+        entry = self._ui(self._add_entry, mode, Entry("tool", f"{tool['nom']} — {tool['commande']}"))
+        code, out = outils.run_captured(self.base_config, tool["commande"])
+        if entry is not None:
+            self._ui(self._paint, entry, None,
+                     summarize_result(out or "(aucune sortie)", max_lines=30) + f"\n[code {code}]")
+        self._ui(self._reload_tree)
+
+    @work(thread=True, group="projet")
+    def _clone_project(self, mode: Mode, url: str, nom: str) -> None:
+        entry = self._ui(self._add_entry, mode, Entry("tool", f"git clone {url}", detail="en cours…"))
+        try:
+            target = outils.clone(self.base_config, url, nom)
+        except outils.OutilError as e:
+            if entry is not None:
+                self._ui(self._paint, entry, None, "échec")
+            self._ui(self._add_entry, mode, Entry("error", str(e)))
+            return
+        if entry is not None:
+            self._ui(self._paint, entry, None, f"cloné dans {target.name}/")
+        self._ui(self._project_ready, mode, target, "cloné")
+
+    def _project_ready(self, mode: Mode, target: Path, verb: str) -> None:
+        self._add_entry(mode, Entry("info", f"Projet « {target.name} » {verb} dans le dossier de "
+                                            f"travail. Demande à REA de travailler dedans "
+                                            f"(ex : « regarde le projet {target.name} »)."))
+        self._reload_tree()
+        for name in ("README.md", "readme.md", "README"):
+            if (target / name).is_file():
+                self._open_file(target / name)
+                break
 
     # ------------------------------------------------------------------ raccourcis
     @property
@@ -857,6 +1170,42 @@ class LexosApp(App):
                         self._open_file(target)
                     else:
                         self._info(f"Fichier introuvable : {arg}", "error")
+        elif word == "/accueil":
+            self.action_home()
+        elif word == "/outils":
+            if arg:
+                self._launch_tool(arg)
+            else:
+                self.action_pick_tool()
+        elif word == "/outil":
+            if arg:
+                self._launch_tool(arg)
+            else:
+                self._info(outils.describe(self.base_config))
+        elif word == "/ajouter-outil":
+            nom, sep, cmd = arg.partition("=")
+            try:
+                if not sep:
+                    raise outils.OutilError("Usage : /ajouter-outil <nom> = <commande>")
+                self._info(outils.add(self.base_config, nom, cmd))
+            except outils.OutilError as e:
+                self._info(str(e), "error")
+        elif word == "/retirer-outil":
+            try:
+                self._info(outils.remove(self.base_config, arg))
+            except outils.OutilError as e:
+                self._info(str(e), "error")
+        elif word == "/cloner":
+            parts = arg.split()
+            if not 1 <= len(parts) <= 2:
+                self._info("Usage : /cloner <proprio/depot ou adresse> [dossier]", "error")
+            else:
+                self._clone_project(mode, parts[0], parts[1] if len(parts) == 2 else "")
+        elif word == "/nouveau":
+            try:
+                self._project_ready(mode, outils.new_project(self.base_config, arg), "créé")
+            except outils.OutilError as e:
+                self._info(str(e), "error")
         elif word == "/retenir":
             self._info(remember(mode.config, arg))
         elif word == "/model":
@@ -966,7 +1315,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.workspace:
         config.workspace = Path(args.workspace).expanduser().resolve()
         config.workspace.mkdir(parents=True, exist_ok=True)
-    LexosApp(config).run()
+    LexosApp(config, splash=True).run()
     return 0
 
 
