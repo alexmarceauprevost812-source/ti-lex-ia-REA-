@@ -121,16 +121,18 @@ def test_fmt_call_and_summary():
 def test_code_theme_is_neon_on_black():
     assert tui.NeonStyle.background_color == "#000000"
     assert tui.SKY == "#87ceeb" and tui.WHITE == "#ffffff"
+    assert tui.AI_COLOR == tui.NEON_ORANGE and tui.GOLD == "#ffd700"   # IA orange néon, commandes or
+    assert tui.fmt_call("run_shell", {"command": "ls -la"}) == "$ ls -la"
 
 
 # ----------------------------------------------------------------------- l'application
-def test_starts_black_in_rea_with_four_tabs(tmp_path):
+def test_starts_black_in_rea_with_all_tabs(tmp_path):
     async def scenario():
         app, _ = make_app(tmp_path)
         async with app.run_test(size=(140, 40)) as pilot:
             await pilot.pause(0.2)
             assert app.current.key == "rea"
-            assert [t.id for t in app.query("Tab")] == ["rea", "codex", "chat", "heretic"]
+            assert [t.id for t in app.query("Tab")] == ["rea", "codex", "chat", "heretic", "terminalcodex"]
             assert app.theme == "lexos-noir"
             assert app.screen.styles.background.hex.lower() == "#000000"
             assert app.focused.id == "prompt"
@@ -546,7 +548,7 @@ def test_accueil_echap_passe_l_animation_et_cloner_prepare_la_commande(tmp_path)
             await pilot.press("escape")
             await pilot.pause()
             assert app.screen.query_one("#splash-menu").option_count == len(tui.MENU_CHOICES)
-            await pilot.press("6")
+            await pilot.press("7")
             await pilot.pause()
             assert app.query_one("#prompt", Input).value == "/cloner "
     run(go())
@@ -627,4 +629,220 @@ def test_heretic_est_un_onglet_et_un_choix_du_menu_d_accueil(tmp_path, monkeypat
             await type_and_send(pilot, "/heretic")
             await pilot.pause(0.2)
             assert app.current.key == "heretic"
+    run(go())
+
+
+# ------------------------------------------------------------------ TerminalCodex
+def _appel(nom, **args):
+    return {"role": "assistant", "content": "",
+            "tool_calls": [{"function": {"name": nom, "arguments": args}}]}
+
+
+def test_terminalcodex_l_ia_lance_la_commande_apres_confirmation(tmp_path):
+    FakeClient.script = [_appel("run_shell", command="echo allo-codex | tee trace.txt"),
+                         {"role": "assistant", "content": "C'est fait."}]
+
+    async def go():
+        app, ws = make_app(tmp_path, resolve_models=False)
+        async with app.run_test(size=(140, 40)) as pilot:
+            await type_and_send(pilot, "/terminalcodex")
+            await pilot.pause(0.2)
+            assert app.current.key == "terminalcodex" and app.current.tools
+            await type_and_send(pilot, "écris allo dans trace.txt")
+            for _ in range(100):
+                await pilot.pause(0.05)
+                if isinstance(app.screen, ConfirmScreen):
+                    break
+            assert isinstance(app.screen, ConfirmScreen)           # demande avant de lancer
+            assert "echo allo-codex" in app.screen.question
+            assert not (ws / "trace.txt").exists()
+            await pilot.press("o")
+            await wait_idle(app, pilot)
+            assert (ws / "trace.txt").read_text().strip() == "allo-codex"
+            assert entry_kinds(app, "terminalcodex")[-1] == "ai"
+    run(go())
+
+
+def test_terminalcodex_refus_ne_lance_rien(tmp_path):
+    FakeClient.script = [_appel("run_shell", command="touch interdit.txt"),
+                         {"role": "assistant", "content": "D'accord, je ne le fais pas."}]
+
+    async def go():
+        app, ws = make_app(tmp_path, resolve_models=False)
+        async with app.run_test(size=(140, 40)) as pilot:
+            await type_and_send(pilot, "/terminalcodex")
+            await pilot.pause(0.2)
+            await type_and_send(pilot, "crée un fichier")
+            for _ in range(100):
+                await pilot.pause(0.05)
+                if isinstance(app.screen, ConfirmScreen):
+                    break
+            await pilot.press("n")
+            await wait_idle(app, pilot)
+            assert not (ws / "interdit.txt").exists()
+    run(go())
+
+
+def test_terminalcodex_auto_sans_question_sauf_commande_dangereuse(tmp_path):
+    FakeClient.script = [_appel("run_shell", command="echo ok > auto.txt"),
+                         _appel("run_shell", command="sudo touch danger.txt"),
+                         {"role": "assistant", "content": "Fini."}]
+
+    async def go():
+        app, ws = make_app(tmp_path, resolve_models=False)
+        async with app.run_test(size=(140, 40)) as pilot:
+            await type_and_send(pilot, "/terminalcodex")
+            await pilot.pause(0.2)
+            await type_and_send(pilot, "/auto")
+            await pilot.pause(0.1)
+            assert app.modes["terminalcodex"].agent.tools.auto_approve
+            await type_and_send(pilot, "fais les deux")
+            for _ in range(100):
+                await pilot.pause(0.05)
+                if isinstance(app.screen, ConfirmScreen):
+                    break
+            assert (ws / "auto.txt").exists()                      # parti sans question
+            assert isinstance(app.screen, ConfirmScreen)           # sudo : on redemande
+            assert "DANGEREUSE" in app.screen.question
+            await pilot.press("n")
+            await wait_idle(app, pilot)
+            assert not (ws / "danger.txt").exists()
+            await type_and_send(pilot, "/auto")
+            await pilot.pause(0.1)
+            assert not app.modes["terminalcodex"].agent.tools.auto_approve
+    run(go())
+
+
+def test_terminalcodex_utilise_la_bibliotheque_et_les_outils_installes(tmp_path):
+    FakeClient.script = [_appel("list_library_tools"), _appel("list_installed_tools"),
+                         _appel("run_library_tool", name="salut"),
+                         {"role": "assistant", "content": "Outil lancé."}]
+
+    async def go():
+        app, ws = make_app(tmp_path, resolve_models=False)
+        async with app.run_test(size=(140, 40)) as pilot:
+            await type_and_send(pilot, "/ajouter-outil salut = echo biblio > biblio.txt")
+            await type_and_send(pilot, "/terminalcodex")
+            await pilot.pause(0.2)
+            await type_and_send(pilot, "/auto")
+            await type_and_send(pilot, "lance mon outil salut")
+            await wait_idle(app, pilot)
+            assert (ws / "biblio.txt").read_text().strip() == "biblio"
+            outils_vus = [m["content"] for m in app.modes["terminalcodex"].agent.messages
+                          if m.get("role") == "tool"]
+            assert "salut — echo biblio" in outils_vus[0]
+            assert "Installés :" in outils_vus[1]
+            noms = [t["function"]["name"] for t in app.modes["terminalcodex"].agent.tool_schemas]
+            assert "run_shell" in noms and "run_command" not in noms
+            assert "run_shell" not in [t["function"]["name"]
+                                       for t in app.modes["rea"].agent.tool_schemas]
+    run(go())
+
+
+def test_sudo_ne_bloque_jamais_sur_un_mot_de_passe():
+    from ti_lex_agent.tools import DANGEROUS, sudo_noninteractive
+    assert sudo_noninteractive("sudo apt install -y nmap && sudo ls") == \
+        "sudo -n apt install -y nmap && sudo -n ls"
+    assert sudo_noninteractive("sudo -n true") == "sudo -n true"
+    assert sudo_noninteractive("echo pseudo") == "echo pseudo"
+    assert DANGEROUS.search("sudo apt install -y nmap")    # confirmé même en mode /auto
+
+
+def test_commande_sudo_explique_comment_donner_le_mot_de_passe_une_fois(tmp_path):
+    async def go():
+        app, _ = make_app(tmp_path, resolve_models=False)
+        async with app.run_test(size=(140, 40)) as pilot:
+            await type_and_send(pilot, "/sudo")            # sans vrai terminal : explique
+            await pilot.pause(0.2)
+            assert app.current.transcript[-1].kind == "error"
+            assert app._sudo_timer is None
+            await type_and_send(pilot, "/sudo off")
+            await pilot.pause(0.1)
+            assert "fermée" in app.current.transcript[-1].text
+    run(go())
+
+
+def test_ecriture_fluide_la_reponse_apparait_petit_a_petit(tmp_path, monkeypatch):
+    longue = "Voici une réponse assez longue pour qu'on la voie s'écrire. " * 6
+    FakeClient.script = [{"role": "assistant", "content": longue}]
+
+    async def go():
+        app, _ = make_app(tmp_path, resolve_models=False)
+        async with app.run_test(size=(140, 40)) as pilot:
+            await type_and_send(pilot, "raconte")
+            vus = set()
+            for _ in range(400):
+                await pilot.pause(0.01)
+                ai = [e for e in app.current.transcript if e.kind == "ai"]
+                if ai:
+                    vus.add(len(ai[-1].text))
+                if ai and ai[-1].text == longue.strip() and not app.busy:
+                    break
+            assert [e for e in app.current.transcript if e.kind == "ai"][-1].text == longue.strip()
+            assert len(vus) > 3                            # plusieurs étapes intermédiaires
+    run(go())
+
+
+def test_animation_terminalcodex_le_mot_se_pose_au_centre():
+    logo = tui.TERMINALCODEX_LOGO
+    assert len(logo.letters) == len("TerminalCodex") and logo.white == len("Terminal")
+    fin = tui.splash_frame(tui.splash_done_tick(logo) + 10, logo, True).plain.splitlines()
+    assert [ligne.rstrip() for ligne in fin[-5:]] == [
+        "  ______                    _             ________          __",
+        " /_  __/__  _________ ___  (_)___  ____ _/ / ____/___  ____/ /__  _  __",
+        "  / / / _ \\/ ___/ __ `__ \\/ / __ \\/ __ `/ / /   / __ \\/ __  / _ \\| |/_/",
+        " / / /  __/ /  / / / / / / / / / / /_/ / / /___/ /_/ / /_/ /  __/>  <",
+        "/_/  \\___/_/  /_/ /_/ /_/_/_/ /_/\\__,_/_/\\____/\\____/\\__,_/\\___/_/|_|",
+    ]
+    assert all(len(ligne) == logo.width for ligne in fin)   # largeur exacte : centrable
+    assert not any(ch in tui.splash_frame(0, logo, True).plain for ch in "/_|")
+
+
+def test_entree_dans_terminalcodex_animation_puis_interface_avec_invite(tmp_path, monkeypatch):
+    monkeypatch.setattr(tui, "SPLASH_STEP", 0.004)
+    monkeypatch.setattr(tui, "INTRO_HOLD", 0.3)
+
+    async def go():
+        app, _ = make_app(tmp_path, resolve_models=False, splash=True)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            await pilot.press("escape")                    # accueil : passe l'animation
+            await pilot.pause()
+            await pilot.press("5")                         # 5e choix : TerminalCodex
+            await pilot.pause(0.05)
+            assert isinstance(app.screen, tui.IntroScreen)
+            logo = app.screen.query_one("#intro-logo")
+            for _ in range(300):                           # le mot finit par se poser…
+                await pilot.pause(0.01)
+                if not isinstance(app.screen, tui.IntroScreen):
+                    break
+            # …puis, après la pause, on arrive dans l'outil, invite prête
+            assert not isinstance(app.screen, tui.IntroScreen)
+            assert app.current.key == "terminalcodex"
+            assert app.focused.id == "prompt"
+            # le mot était centré sur l'écran
+            assert abs((logo.region.x + logo.region.width / 2) - 60) <= 1
+            # une seule fois par session : y revenir n'affiche plus l'animation
+            await type_and_send(pilot, "/rea")
+            await pilot.pause(0.1)
+            await type_and_send(pilot, "/terminalcodex")
+            await pilot.pause(0.1)
+            assert not isinstance(app.screen, tui.IntroScreen)
+    run(go())
+
+
+def test_entree_dans_terminalcodex_une_touche_passe_l_animation(tmp_path):
+    async def go():
+        app, _ = make_app(tmp_path, resolve_models=False, splash=True)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            await pilot.press("escape")
+            await pilot.pause()
+            await pilot.press("5")
+            await pilot.pause(0.05)
+            assert isinstance(app.screen, tui.IntroScreen)
+            await pilot.press("space")
+            await pilot.pause(0.1)
+            assert not isinstance(app.screen, tui.IntroScreen)
+            assert app.current.key == "terminalcodex" and app.focused.id == "prompt"
     run(go())

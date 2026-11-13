@@ -121,3 +121,11 @@ def test_agent_stops_after_max_steps(config):
         {"function": {"name": "list_files", "arguments": {}}}]}
     agent = Agent(config, client=FakeClient([loop_reply] * 3), confirm=lambda _q: True)
     assert "limite" in agent.run("boucle")
+
+
+def test_terminalcodex_sur_telephone_termux_utilise_pkg_sans_sudo():
+    from ti_lex_agent.agent import TERMINAL_SYSTEM, terminal_system_prompt
+    assert terminal_system_prompt({}) == TERMINAL_SYSTEM
+    termux = terminal_system_prompt({"TERMUX_VERSION": "0.118", "PREFIX": "/data/data/com.termux/files/usr"})
+    assert "pkg install" in termux and "PAS de sudo" in termux
+    assert "pkg install" in terminal_system_prompt({"PREFIX": "/data/data/com.termux/files/usr"})

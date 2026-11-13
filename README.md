@@ -157,7 +157,7 @@ Une seule fenêtre de terminal pour REA, Codex, Chat et Heretic : **seul le mote
 outils, consigne). Heretic (`/heretic`, `TILEX_HERETIC_MODEL`, défaut `heretic:latest`) est un chat
 direct sans outils ; le menu `lexos-ia` existe toujours.
 
-- Thème noir : ce que tu écris en blanc, les réponses de l'IA en bleu ciel, le code en couleurs néon.
+- Thème noir : ce que tu écris en blanc, les réponses de l'IA en orange néon, le code en couleurs néon.
 - Onglets REA / Codex / Chat / Heretic (clic, `Ctrl+T`, ou `/rea` `/codex` `/chat` `/heretic`) — chaque mode garde sa
   propre conversation.
 - Panneau de fichiers à gauche (`Ctrl+B`) : un clic sur un fichier l'ouvre dans l'aperçu coloré à
@@ -168,7 +168,21 @@ direct sans outils ; le menu `lexos-ia` existe toujours.
   indicateur tourne avec le temps écoulé. `TILEX_SANS_ANIMATION=1 ti-lex` les coupe.
 - **Accueil animé** : au lancement, les lettres « TI-LEX » arrivent du ciel à 45° et se posent
   bien droit sur une ligne (« TI- » en blanc, « LEX » en orange néon), puis les choix du menu arrivent un par
-  un. `Échap` passe l'animation, les chiffres `1`-`7` choisissent, `/accueil` y revient.
+  un. `Échap` passe l'animation, les chiffres `1`-`9` choisissent, `/accueil` y revient.
+- **TerminalCodex** (onglet, `/terminalcodex`, choix 5 de l'accueil) : tu écris ce que tu veux en
+  mots simples, l'IA locale trouve les commandes et les lance dans ton dossier de travail. Elle
+  connaît les programmes installés et ta bibliothèque « Outils créés ». Chaque commande te demande
+  confirmation ; `/auto` les laisse partir sans demander — sauf les commandes dangereuses (`sudo`,
+  `rm -rf /`, formatage, extinction…) qui redemandent toujours. Modèle : `TILEX_TERMINAL_MODEL`
+  (défaut `qwen3:8b`, il faut un modèle qui sait appeler des outils).
+  - `/sudo` : tape ton mot de passe **une seule fois** (dans le vrai terminal ; il n'est ni vu par
+    l'IA ni enregistré). Ensuite TerminalCodex peut installer des outils (`sudo apt install…`) sans
+    le redemander tant que l'interface est ouverte. `/sudo off` ferme la session.
+  - À la première ouverture, le mot « TerminalCodex » tombe du ciel, reste 2 secondes au centre de
+    l'écran, puis l'outil s'ouvre (une touche passe l'animation).
+  - Sur un téléphone (Termux), il installe avec `pkg install` au lieu de `sudo apt`.
+- **Couleurs et écriture** : l'IA écrit en orange néon, les commandes lancées sont en jaune or, et
+  les réponses de REA et TerminalCodex s'écrivent de façon fluide (Échap les affiche d'un coup).
 - **Outils créés** (`F2` ou `/outils`) : ta bibliothèque d'outils de terminal.
   `/ajouter-outil sauvegarde = bash ~/scripts/backup.sh` l'ajoute, `/outil sauvegarde` le lance
   (l'interface se met de côté le temps que l'outil tourne, puis revient), `/retirer-outil` l'enlève.

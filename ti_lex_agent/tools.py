@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import ipaddress
 import os
+import re
 import shlex
+import shutil
 import socket
 import subprocess
 from html.parser import HTMLParser
@@ -22,6 +24,21 @@ import requests
 
 from .config import Config
 from .ollama_client import OllamaClient
+
+# Commandes qui peuvent détruire le système : même en mode /auto, on redemande toujours.
+DANGEROUS = re.compile(
+    r"(\brm\s+(-\w*\s+)*-\w*[rf]\w*\s+(/|~|\$HOME|\*)(\s|$)"      # rm -rf / ~ * $HOME
+    r"|\bmkfs\b|\bdd\b[^|;&]*\bof=/dev/|>\s*/dev/(sd|nvme|mmcblk)"     # formatage / écrasement disque
+    r"|:\(\)\s*\{|\bchmod\s+-R\s+\S+\s+/(\s|$)|\bchown\s+-R\s+\S+\s+/(\s|$)"
+    r"|\b(shutdown|reboot|poweroff|halt)\b|\bsudo\b|\bsu\s+-?\s*$"
+    r"|\b(curl|wget)\b[^|;&]*\|\s*(sudo\s+)?(ba|z)?sh\b)")
+# Programmes courants qu'on regarde d'abord pour dire à l'IA ce qui est installé.
+COMMON_TOOLS = ["git", "python3", "pip", "node", "npm", "docker", "curl", "wget", "ssh", "scp",
+                "rsync", "tar", "zip", "unzip", "grep", "sed", "awk", "jq", "find", "tree",
+                "make", "gcc", "go", "cargo", "rustc", "java", "nmap", "ffmpeg", "sqlite3",
+                "htop", "tmux", "vim", "nano", "ip", "ping", "df", "du", "ps", "systemctl",
+                "apt", "ollama", "gh"]
+SHELL_TIMEOUT = 120
 
 MAX_OUTPUT = 8000          # caractères renvoyés au modèle par outil
 MAX_DOWNLOAD = 1_000_000   # octets lus par page web
@@ -146,6 +163,9 @@ class Toolbox:
         self.config = config
         self.client = client
         self.confirm = confirm or self._ask_terminal
+        # Mode « auto » de TerminalCodex : lance les commandes sans demander à chaque fois
+        # (sauf les commandes dangereuses : DANGEROUS). Désactivé par défaut.
+        self.auto_approve = False
 
     # ------------------------------------------------------------ utilitaires
     @staticmethod
@@ -264,3 +284,117 @@ class Toolbox:
         except subprocess.TimeoutExpired as e:
             raise ToolError("La commande a dépassé 60 secondes.") from e
         return f"code de sortie : {done.returncode}\n--- sortie ---\n{done.stdout}\n--- erreurs ---\n{done.stderr}"
+
+
+# --------------------------------------------------------------------- TerminalCodex
+def _installed(name: str) -> bool:
+    return shutil.which(name) is not None
+
+
+def _tool_list_installed(self, search: str = "") -> str:
+    """Programmes présents sur ce PC. `search` cherche un nom précis dans tout le PATH."""
+    if search.strip():
+        name = search.strip()
+        path = shutil.which(name)
+        return f"{name} : {path}" if path else f"{name} : introuvable sur ce PC."
+    found = [t for t in COMMON_TOOLS if _installed(t)]
+    return ("Installés : " + ", ".join(found) + "\n(Tout autre programme du PATH peut aussi être "
+            "lancé ; list_installed_tools(search=\"nom\") vérifie un programme précis.)")
+
+
+def _tool_list_library(self) -> str:
+    """Les outils créés par l'utilisateur (bibliothèque « Outils créés »)."""
+    from . import outils
+    try:
+        tools = outils.load(self.config)
+    except outils.OutilError as e:
+        raise ToolError(str(e)) from e
+    if not tools:
+        return "La bibliothèque est vide."
+    return "\n".join(f"{t['nom']} — {t['commande']}" + (f"  ({t['description']})" if t.get("description") else "")
+                     for t in tools)
+
+
+def sudo_noninteractive(command: str) -> str:
+    """« sudo » ne doit jamais attendre un mot de passe (personne ne peut le taper ici) :
+    on ajoute -n. Le mot de passe se donne une seule fois, avec /sudo, dans le vrai terminal."""
+    return re.sub(r"\bsudo\b(?!\s+-n\b)", "sudo -n", command)
+
+
+SUDO_HELP = ("sudo a besoin du mot de passe. Dis à l'utilisateur de taper /sudo une fois "
+             "(il l'écrit dans son terminal, il n'est jamais enregistré), puis réessaie.")
+
+
+def _run_shell_confirmed(self, command: str, label: str) -> str:
+    command = command.strip()
+    if not command:
+        raise ToolError("Commande vide.")
+    risky = bool(DANGEROUS.search(command))
+    if risky:
+        if not self.confirm(f"⚠ COMMANDE DANGEREUSE — la lancer quand même ?\n    {command}"):
+            raise ToolError("L'utilisateur a refusé cette commande.")
+    elif not self.auto_approve and not self.confirm(f"{label}\n    {command}"):
+        raise ToolError("L'utilisateur a refusé cette commande.")
+    env = dict(os.environ, GIT_TERMINAL_PROMPT="0", PAGER="cat", DEBIAN_FRONTEND="noninteractive")
+    command = sudo_noninteractive(command)
+    try:
+        done = subprocess.run(command, shell=True, cwd=self.config.workspace, capture_output=True,
+                              text=True, timeout=SHELL_TIMEOUT, stdin=subprocess.DEVNULL, env=env)
+    except subprocess.TimeoutExpired as e:
+        raise ToolError(f"La commande a dépassé {SHELL_TIMEOUT} secondes (elle a été arrêtée). "
+                        "Lance-la en arrière-plan ou découpe-la.") from e
+    note = ""
+    if done.returncode != 0 and "sudo" in command and re.search(
+            r"password is required|mot de passe est (requis|nécessaire)|a terminal is required",
+            done.stderr):
+        note = f"\n--- note ---\n{SUDO_HELP}"
+    return (f"code de sortie : {done.returncode}\n--- sortie ---\n{done.stdout}\n"
+            f"--- erreurs ---\n{done.stderr}{note}")
+
+
+def _tool_run_shell(self, command: str) -> str:
+    """Lance une commande shell (pipes, &&, redirections permis) dans le dossier de travail."""
+    return _run_shell_confirmed(self, command, "Lancer cette commande ?")
+
+
+def _tool_run_library_tool(self, name: str) -> str:
+    """Lance un outil de la bibliothèque « Outils créés » par son nom."""
+    from . import outils
+    tool = outils.find(self.config, name)
+    if tool is None:
+        raise ToolError(f"Aucun outil nommé « {name} » dans la bibliothèque (list_library_tools).")
+    return _run_shell_confirmed(self, tool["commande"], f"Lancer l'outil « {tool['nom']} » ?")
+
+
+Toolbox.tool_list_installed_tools = _tool_list_installed
+Toolbox.tool_list_library_tools = _tool_list_library
+Toolbox.tool_run_shell = _tool_run_shell
+Toolbox.tool_run_library_tool = _tool_run_library_tool
+
+_TERMINAL_NEW = [
+    {"type": "function", "function": {
+        "name": "run_shell",
+        "description": ("Lance une commande shell sur l'ordinateur de l'utilisateur, dans son dossier de "
+                        "travail (pipes, &&, redirections permis). L'utilisateur confirme chaque commande. "
+                        "Une seule commande à la fois ; lis la sortie avant la suivante."),
+        "parameters": {"type": "object", "properties": {
+            "command": {"type": "string", "description": "La commande complète"}},
+            "required": ["command"]}}},
+    {"type": "function", "function": {
+        "name": "list_installed_tools",
+        "description": "Dit quels programmes sont installés sur ce PC (ou si un programme précis l'est).",
+        "parameters": {"type": "object", "properties": {
+            "search": {"type": "string", "description": "Nom d'un programme précis (facultatif)"}}}}},
+    {"type": "function", "function": {
+        "name": "list_library_tools",
+        "description": "Liste les outils créés par l'utilisateur (sa bibliothèque « Outils créés »).",
+        "parameters": {"type": "object", "properties": {}}}},
+    {"type": "function", "function": {
+        "name": "run_library_tool",
+        "description": "Lance un outil de la bibliothèque de l'utilisateur par son nom.",
+        "parameters": {"type": "object", "properties": {
+            "name": {"type": "string", "description": "Nom de l'outil"}}, "required": ["name"]}}},
+]
+_TERMINAL_KEEP = {"list_files", "read_file", "write_file", "web_search", "fetch_page"}
+TERMINAL_TOOL_SCHEMAS: list[dict] = (
+    _TERMINAL_NEW + [t for t in TOOL_SCHEMAS if t["function"]["name"] in _TERMINAL_KEEP])

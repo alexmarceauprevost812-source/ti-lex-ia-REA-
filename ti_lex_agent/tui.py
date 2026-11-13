@@ -17,6 +17,8 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import shutil
+import subprocess
 import threading
 import time
 from dataclasses import dataclass, field
@@ -42,14 +44,14 @@ from textual.widgets import Button, DirectoryTree, Footer, Input, OptionList, St
 from textual.widgets.option_list import Option
 
 from . import outils
-from .agent import Agent
+from .agent import Agent, terminal_system_prompt
 from .config import Config
 from .launcher import (CHAT_SYSTEM, CODEX_SYSTEM, FALLBACK_CHAT, FALLBACK_CODEX,
                        FALLBACK_REA, HERETIC_SYSTEM, _env_model, _has_model)
 from .memory import remember, with_memory
 from .ollama_client import OllamaClient, OllamaError
 from .params import DEFAULTS, describe, set_param
-from .tools import ToolError, resolve_workspace_path
+from .tools import TERMINAL_TOOL_SCHEMAS, ToolError, resolve_workspace_path
 
 # --------------------------------------------------------------------------- couleurs
 BLACK = "#000000"
@@ -61,6 +63,9 @@ NEON_PINK = "#ff2bd6"
 NEON_GREEN = "#39ff14"
 NEON_YELLOW = "#ffe600"
 NEON_ORANGE = "#ff9f1c"
+AI_COLOR = NEON_ORANGE     # ce que l'IA écrit : orange néon
+GOLD = "#ffd700"           # les commandes lancées : jaune or
+TYPE_SECONDS = 1.2         # durée max de l'écriture fluide d'une réponse
 NEON_PURPLE = "#b967ff"
 RED = "#ff3860"
 
@@ -213,10 +218,10 @@ def code_panel(code: str, lang: str) -> Panel:
 
 def render_ai(label: str, text: str) -> RenderableType:
     visible, thinking = split_think(text)
-    parts: list[RenderableType] = [Text(f"{label} ▸", style=f"bold {SKY}")]
+    parts: list[RenderableType] = [Text(f"{label} ▸", style=f"bold {AI_COLOR}")]
     for kind, body, lang in split_blocks(visible):
         if kind == "text":
-            parts.append(Markdown(body, style=SKY, inline_code_theme=NeonStyle))
+            parts.append(Markdown(body, style=AI_COLOR, inline_code_theme=NeonStyle))
         else:
             parts.append(code_panel(body, lang))
     if thinking:
@@ -228,6 +233,8 @@ def render_ai(label: str, text: str) -> RenderableType:
 
 def fmt_call(name: str, args: dict) -> str:
     """Résumé lisible d'un appel d'outil."""
+    if name == "run_shell" and "command" in args:
+        return f"$ {str(args['command'])[:200]}"
     main = next((args[k] for k in ("path", "command", "query", "url") if k in args), None)
     if name == "write_file" and "content" in args:
         return f"{name}  {args.get('path', '?')}  ({len(str(args['content']))} car.)"
@@ -255,62 +262,172 @@ def pick_model(available: list[str], primary: str, fallback: str) -> tuple[str, 
 
 
 # --------------------------------------------------------------------------- accueil
-SPLASH_FONT = {   # police « slant » (comme la bannière KALI), une lettre = 5 lignes
-    "T": [
-        '  ______',
-        ' /_  __/',
-        '  / /',
-        ' / /',
-        '/_/',
+@dataclass(frozen=True)
+class Logo:
+    """Un mot en grandes lettres (police « slant », comme la bannière KALI). Chaque lettre
+    est donnée à sa place finale : superposées, elles redonnent le mot exact."""
+    width: int
+    white: int
+    letters: list
+
+
+TILEX_LOGO = Logo(
+    width=34, white=3,   # les 3 premières lettres en blanc, le reste en orange néon
+    letters=[
+        [   # T
+            '  ______',
+            ' /_  __/',
+            '  / /',
+            ' / /',
+            '/_/',
+        ],
+        [   # I
+            '        ____',
+            '          _/',
+            '       / /',
+            '     _/ /',
+            '    /___/',
+        ],
+        [   # -
+            '',
+            '',
+            '          _____',
+            '         _____/',
+            '',
+        ],
+        [   # L
+            '                 __',
+            '                / /',
+            '               / /',
+            '                /___',
+            '             /_____/',
+        ],
+        [   # E
+            '                       ______',
+            '                      / ____/',
+            '                     / __/',
+            '                    / /___',
+            '                    _____/',
+        ],
+        [   # X
+            '                             _  __',
+            '                              |/ /',
+            '                            |   /',
+            '                           /   |',
+            '                          /_/|_|',
+        ],
     ],
-    "I": [
-        '        ____',
-        '          _/',
-        '       / /',
-        '     _/ /',
-        '    /___/',
+)
+
+TERMINALCODEX_LOGO = Logo(
+    width=71, white=8,   # les 8 premières lettres en blanc, le reste en orange néon
+    letters=[
+        [   # T
+            '  ______',
+            ' /_  __/',
+            '  / /',
+            ' / /',
+            '/_/',
+        ],
+        [   # e
+            '',
+            '        __',
+            '      / _ \\',
+            '     /  __/',
+            '     \\___/',
+        ],
+        [   # r
+            '',
+            '            _____',
+            '           / ___/',
+            '            /',
+            '          _/',
+        ],
+        [   # m
+            '',
+            '                 ____ ___',
+            '                  __ `__ \\',
+            '               / / / / / /',
+            '              /_/ /_/ /_/',
+        ],
+        [   # i
+            '                            _',
+            '                           (_)',
+            '                          / /',
+            '                           /',
+            '                         _/',
+        ],
+        [   # n
+            '',
+            '                              ___',
+            '                              __ \\',
+            '                             / / /',
+            '                           _/ /_/',
+        ],
+        [   # a
+            '',
+            '                                   ____ _',
+            '                                  / __ `/',
+            '                                   /_/ /',
+            '                                 \\__,_/',
+        ],
+        [   # l
+            '                                          __',
+            '                                         / /',
+            '                                          /',
+            '                                         /',
+            '                                       _/',
+        ],
+        [   # C
+            '                                            ______',
+            '                                             ____/',
+            '                                            /',
+            '                                           /___',
+            '                                         \\____/',
+        ],
+        [   # o
+            '',
+            '                                                  ___',
+            '                                                / __ \\',
+            '                                               / /_/ /',
+            '                                               \\____/',
+        ],
+        [   # d
+            '                                                            __',
+            '                                                       ____/ /',
+            '                                                      / __  /',
+            '                                                       /_/ /',
+            '                                                     \\__,_/',
+        ],
+        [   # e
+            '',
+            '                                                              __',
+            '                                                              _ \\',
+            '                                                              __/',
+            '                                                           \\___/',
+        ],
+        [   # x
+            '',
+            '                                                                  _  __',
+            '                                                                 | |/_/',
+            '                                                                 >  <',
+            '                                                                _/|_|',
+        ],
     ],
-    "-": [
-        '',
-        '',
-        '          _____',
-        '         _____/',
-        '',
-    ],
-    "L": [
-        '                 __',
-        '                / /',
-        '               / /',
-        '                /___',
-        '             /_____/',
-    ],
-    "E": [
-        '                       ______',
-        '                      / ____/',
-        '                     / __/',
-        '                    / /___',
-        '                    _____/',
-    ],
-    "X": [
-        '                             _  __',
-        '                              |/ /',
-        '                            |   /',
-        '                           /   |',
-        '                          /_/|_|',
-    ],
-}
-SPLASH_WIDTH = 34
-SPLASH_WORD = "TI-LEX"
+)
+
 SPLASH_ROWS = 12            # hauteur du « ciel » ; le mot se pose tout en bas, bien droit
 SPLASH_GAP = 3              # images d'écart entre deux lettres qui tombent
 SPLASH_SLIDE = 2            # colonnes par ligne de chute : 2 ≈ une descente à 45°
 SPLASH_STEP = 0.05          # secondes entre deux images
 MENU_STEP = 0.13            # secondes entre l'apparition de deux choix
+INTRO_HOLD = 2.0            # secondes où le mot reste affiché avant d'ouvrir l'outil
 MENU_CHOICES = [
     ("rea", "REA", "agent complet : web, vision, fichiers, commandes"),
     ("codex", "Codex", "assistant de programmation"),
     ("chat", "Chat", "conversation générale"),
     ("heretic", "Heretic", "chat direct, sans filtre (modèle décensuré)"),
+    ("terminalcodex", "TerminalCodex", "écris ce que tu veux : l'IA lance les commandes"),
     ("outils", "Outils créés", "ta bibliothèque d'outils"),
     ("cloner", "Cloner un projet GitHub", "copie un dépôt dans ton dossier de travail"),
     ("nouveau", "Nouveau projet", "démarre un projet vide"),
@@ -327,27 +444,30 @@ def splash_letter_pos(index: int, tick: int) -> tuple[int, int]:
     return y, (target - y) * SPLASH_SLIDE
 
 
-def splash_done_tick() -> int:
-    return SPLASH_ROWS + (len(SPLASH_WORD) - 1) * SPLASH_GAP
+def splash_done_tick(logo: Logo = TILEX_LOGO) -> int:
+    return SPLASH_ROWS + (len(logo.letters) - 1) * SPLASH_GAP
 
 
-def splash_frame(tick: int) -> Text:
+def splash_frame(tick: int, logo: Logo = TILEX_LOGO, centered: bool = False) -> Text:
     """Une image de l'animation : chaque lettre arrive du ciel en diagonale (45°) et se
-    pose à sa place ; le mot fini est bien droit, sur une seule ligne."""
+    pose à sa place ; le mot fini est bien droit, sur une seule ligne.
+    `centered` : l'image fait exactement la largeur du mot (pour le centrer à l'écran) ;
+    les lettres de la moitié gauche arrivent alors par la gauche, les autres par la droite."""
     target = SPLASH_ROWS - 5
-    width = SPLASH_WIDTH + (target + 5) * SPLASH_SLIDE
+    width = logo.width if centered else logo.width + (target + 5) * SPLASH_SLIDE
     grid: list[list[tuple[str, str]]] = [[(" ", WHITE)] * width for _ in range(SPLASH_ROWS)]
-    for i, ch in enumerate(SPLASH_WORD):
-        glyph = SPLASH_FONT[ch]
+    for i, glyph in enumerate(logo.letters):
         y, dx = splash_letter_pos(i, tick)
+        if centered and i < len(logo.letters) / 2:
+            dx = -dx
         landed = y >= target
         just = landed and (-5 + tick - i * SPLASH_GAP) - target < 3     # éclat à l'atterrissage
-        final = WHITE if i < 3 else NEON_ORANGE             # « TI- » blanc, « LEX » orange néon
+        final = WHITE if i < logo.white else NEON_ORANGE
         color = (NEON_YELLOW if just else final) if landed else NEON_CYCLE[(tick + i) % len(NEON_CYCLE)]
         for g, line in enumerate(glyph):
             if 0 <= y + g < SPLASH_ROWS:
                 for c, cell in enumerate(line):
-                    if cell != " ":
+                    if cell != " " and 0 <= dx + c < width:
                         grid[y + g][dx + c] = (cell, color)
     out = Text()
     for r, row in enumerate(grid):
@@ -356,6 +476,54 @@ def splash_frame(tick: int) -> Text:
         if r < SPLASH_ROWS - 1:
             out.append("\n")
     return out
+
+
+class IntroScreen(Screen[None]):
+    """Entrée dans un outil : son nom tombe du ciel, reste au centre de l'écran
+    INTRO_HOLD secondes, puis l'outil s'ouvre. N'importe quelle touche passe."""
+
+    def __init__(self, logo: Logo, subtitle: str, animated: bool = True) -> None:
+        super().__init__()
+        self.logo, self.subtitle, self.animated = logo, subtitle, animated
+        self._tick = 0
+        self._timer = None
+        self._closed = False
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="intro"):
+            yield Static("", id="intro-logo")
+            yield Static(Text(self.subtitle, style=GREY), id="intro-sub")
+
+    def on_mount(self) -> None:
+        if not self.animated:
+            self._landed()
+            return
+        self.query_one("#intro-logo", Static).update(splash_frame(0, self.logo, True))
+        self._timer = self.set_interval(SPLASH_STEP, self._fall)
+
+    def _fall(self) -> None:
+        self._tick += 1
+        self.query_one("#intro-logo", Static).update(splash_frame(self._tick, self.logo, True))
+        if self._tick >= splash_done_tick(self.logo) + 3:
+            self._landed()
+
+    def _landed(self) -> None:
+        if self._timer is not None:
+            self._timer.stop()
+        self.query_one("#intro-logo", Static).update(
+            splash_frame(splash_done_tick(self.logo) + 10, self.logo, True))
+        self._timer = self.set_timer(INTRO_HOLD, self._close)
+
+    def _close(self) -> None:
+        if not self._closed:
+            self._closed = True
+            if self._timer is not None:
+                self._timer.stop()
+            self.dismiss(None)
+
+    def on_key(self, event) -> None:
+        event.stop()
+        self._close()
 
 
 class SplashScreen(Screen[str]):
@@ -375,7 +543,7 @@ class SplashScreen(Screen[str]):
             yield Static("", id="splash-logo")
             yield Static(Text("LexOS Pro — ton terminal IA", style=GREY), id="splash-sub")
             yield OptionList(id="splash-menu")
-            yield Static(Text("↑↓ puis Entrée · chiffres 1-8 · Échap passe l'animation",
+            yield Static(Text("↑↓ puis Entrée · chiffres 1-9 · Échap passe l'animation",
                               style=GREY), id="splash-hint")
 
     def on_mount(self) -> None:
@@ -470,7 +638,7 @@ SKIP_DIRS = {".git", "__pycache__", ".venv", "venv", "node_modules", ".pytest_ca
 MAX_VIEW_BYTES = 300_000
 
 AIDE = """\
-Modes        Ctrl+T (suivant) · /rea · /codex · /chat · /heretic · clic sur l'onglet
+Modes        Ctrl+T (suivant) · /rea · /codex · /chat · /heretic · /terminalcodex · clic
 Panneaux     Ctrl+B fichiers · Ctrl+O aperçu · /fichiers · /apercu · clic sur ✕
 Moteur       Ctrl+P ou /model (liste) · /model <nom>
 Fichiers     clic sur un fichier = ouvre l'aperçu · /ouvrir <chemin>
@@ -478,6 +646,8 @@ Conversation Ctrl+N ou /reset · Échap arrête la réponse · /retenir <texte>
 Outils créés F2 ou /outils (liste) · /outil <nom> (lancer)
              /ajouter-outil <nom> = <commande> · /retirer-outil <nom>
 Projets      /cloner <proprio/depot ou adresse> [dossier] · /nouveau <nom>
+             /sudo : tape ton mot de passe UNE fois (pour installer des outils) · /sudo off
+TerminalCodex /auto : lance les commandes sans demander (sauf les dangereuses) · /auto = on/off
 Accueil      /accueil (menu de départ)
 Réglages     /params · /temp <valeur> · /param <nom> <valeur>
 Quitter      Ctrl+Q ou /quit
@@ -621,6 +791,10 @@ class LexosApp(App):
     FooterKey .footer-key--description {{ color: {GREY}; background: {BLACK}; }}
     ConfirmScreen, ModelPicker, ToolPicker {{ align: center middle; background: #000000aa; }}
     SplashScreen {{ align: center middle; background: {BLACK}; }}
+    IntroScreen {{ align: center middle; background: {BLACK}; }}
+    #intro {{ width: auto; height: auto; background: {BLACK}; }}
+    #intro-logo {{ width: auto; height: auto; background: {BLACK}; }}
+    #intro-sub {{ width: 100%; margin-top: 1; text-align: center; background: {BLACK}; }}
     #splash {{ width: auto; height: auto; background: {BLACK}; }}
     #splash-logo {{ width: auto; height: auto; background: {BLACK}; }}
     #splash-sub {{ margin: 1 0; background: {BLACK}; }}
@@ -665,6 +839,8 @@ class LexosApp(App):
         self._busy_since = 0.0
         # TILEX_SANS_ANIMATION=1 coupe les animations (écran lent, SSH, etc.)
         self._animated = not os.environ.get("TILEX_SANS_ANIMATION")
+        self._intro_seen: set[str] = set()   # outils dont l'animation d'entrée a déjà joué
+        self._sudo_timer = None         # garde la session sudo ouverte tant que l'interface tourne
         self._build_modes()
         self.current = self.modes["rea"]
 
@@ -680,6 +856,9 @@ class LexosApp(App):
              _env_model("TILEX_CHAT_FALLBACK", FALLBACK_CHAT), CHAT_SYSTEM, False),
             ("heretic", "Heretic", _env_model("TILEX_HERETIC_MODEL", "heretic:latest"),
              _env_model("TILEX_CHAT_FALLBACK", FALLBACK_CHAT), HERETIC_SYSTEM, False),
+            # TerminalCodex : l'IA locale choisit et lance les commandes (avec ta confirmation).
+            ("terminalcodex", "TerminalCodex", _env_model("TILEX_TERMINAL_MODEL", "qwen3:8b"),
+             _env_model("TILEX_TERMINAL_FALLBACK", FALLBACK_REA), terminal_system_prompt(), True),
         ]
         for key, label, primary, fallback, system, tools in specs:
             cfg = Config(ollama_host=base.ollama_host, model=primary,
@@ -688,8 +867,11 @@ class LexosApp(App):
             mode = Mode(key, label, primary, fallback, system, tools, cfg, client,
                         dict(DEFAULTS))
             if tools:
+                terminal = key == "terminalcodex"
                 mode.agent = Agent(cfg, client=client, confirm=self._confirm,
-                                   options=mode.options)
+                                   options=mode.options,
+                                   system_prompt=system or None,
+                                   tool_schemas=TERMINAL_TOOL_SCHEMAS if terminal else None)
                 self._wrap_tools(mode)
             else:
                 mode.messages = [{"role": "system", "content": with_memory(system, cfg)}]
@@ -703,6 +885,9 @@ class LexosApp(App):
             "codex": "assistant de programmation",
             "chat": "conversation générale",
             "heretic": "chat direct avec le modèle décensuré, sans outils",
+            "terminalcodex": ("écris ce que tu veux faire, l'IA locale trouve et lance les "
+                              "commandes\n(chaque commande te demande confirmation ; /auto pour "
+                              "ne plus demander)"),
         }[mode.key]
         where = str(mode.config.workspace)
         home = str(Path.home())
@@ -716,7 +901,8 @@ class LexosApp(App):
         with Horizontal(id="top"):
             yield Static(Text("LEXOS", style=f"bold {WHITE}"), id="brand")
             yield Tabs(Tab("REA", id="rea"), Tab("Codex", id="codex"),
-                       Tab("Chat", id="chat"), Tab("Heretic", id="heretic"), id="tabs")
+                       Tab("Chat", id="chat"), Tab("Heretic", id="heretic"),
+                       Tab("TerminalCodex", id="terminalcodex"), id="tabs")
         with Horizontal(id="body"):
             with Vertical(id="files"):
                 with Horizontal(classes="panel-head"):
@@ -840,6 +1026,41 @@ class LexosApp(App):
                 self._open_file(target / name)
                 break
 
+    # ------------------------------------------------------------------ sudo (une seule fois)
+    def _sudo_start(self) -> None:
+        """Demande le mot de passe sudo UNE fois, dans le vrai terminal (l'interface se met
+        de côté : ni elle ni l'IA ne voient le mot de passe, il n'est écrit nulle part).
+        Ensuite la session reste ouverte tant que l'interface tourne."""
+        if shutil.which("sudo") is None:
+            self._info("sudo n'est pas installé sur ce système.", "error")
+            return
+        try:
+            with self.suspend():
+                print("\nMot de passe sudo (une seule fois ; il n'est pas enregistré) :", flush=True)
+                ok = subprocess.call(["sudo", "-v"]) == 0
+        except SuspendNotSupported:
+            self._info("Impossible ici : lance « sudo -v » dans ton terminal avant d'ouvrir ti-lex.",
+                       "error")
+            return
+        if not ok:
+            self._info("sudo a refusé (mauvais mot de passe ?). Réessaie avec /sudo.", "error")
+            return
+        if self._sudo_timer is None:
+            self._sudo_timer = self.set_interval(120, self._sudo_keepalive)
+        self._info("Session sudo ouverte : TerminalCodex peut installer des outils sans redemander "
+                   "le mot de passe (chaque commande sudo te demande quand même de confirmer). "
+                   "/sudo off pour la fermer ; elle se ferme aussi quand tu quittes.")
+
+    @work(thread=True, group="sudo")
+    def _sudo_keepalive(self) -> None:
+        subprocess.run(["sudo", "-n", "-v"], capture_output=True, stdin=subprocess.DEVNULL)
+
+    def _sudo_stop(self) -> None:
+        if self._sudo_timer is not None:
+            self._sudo_timer.stop()
+            self._sudo_timer = None
+            subprocess.run(["sudo", "-k"], capture_output=True, stdin=subprocess.DEVNULL)
+
     # ------------------------------------------------------------------ raccourcis
     @property
     def chat(self) -> VerticalScroll:
@@ -862,7 +1083,7 @@ class LexosApp(App):
             return render_ai(entry.label, entry.text)
         if entry.kind == "tool":
             parts: list[RenderableType] = [Text.assemble(
-                ("🔧 ", NEON_YELLOW), (entry.text, f"bold {NEON_YELLOW}"))]
+                ("🔧 ", GOLD), (entry.text, f"bold {GOLD}"))]
             if entry.detail:
                 parts.append(Text(entry.detail, style=GREY))
             return Group(*parts)
@@ -905,8 +1126,9 @@ class LexosApp(App):
     # ------------------------------------------------------------------ état / statut
     def _status_text(self) -> Text:
         m = self.current
+        auto = " · AUTO" if (m.agent and m.agent.tools.auto_approve) else ""
         if not self.busy:
-            return Text(f"● {m.label} · {m.model}", style=GREY)
+            return Text(f"● {m.label} · {m.model}{auto}", style=GREY)
         secs = int(time.monotonic() - self._busy_since)
         color = NEON_CYCLE[(self._tick // 3) % len(NEON_CYCLE)]
         t = Text(f"● {m.label} · {m.model}   ", style=SKY)
@@ -944,6 +1166,12 @@ class LexosApp(App):
             self._render_transcript()
             self._refresh_status()
             self.query_one("#prompt", Input).focus()
+            if tab_id == "terminalcodex" and self.splash and tab_id not in self._intro_seen:
+                self._intro_seen.add(tab_id)
+                self.push_screen(
+                    IntroScreen(TERMINALCODEX_LOGO, "l'IA locale qui lance les commandes pour toi",
+                                animated=self._animated),
+                    lambda _=None: self.query_one("#prompt", Input).focus())
 
     def _go_mode(self, key: str) -> None:
         self.query_one(Tabs).active = key
@@ -1094,7 +1322,7 @@ class LexosApp(App):
 
     def _finish_tool(self, mode: Mode, entry: Entry, name: str, args: dict, result: str) -> None:
         self._paint(entry, detail=summarize_result(result))
-        if name in {"write_file", "run_command"}:
+        if name in {"write_file", "run_command", "run_shell", "run_library_tool"}:
             self._reload_tree()
         if name in {"write_file", "read_file"} and not result.startswith("Erreur"):
             try:
@@ -1151,7 +1379,7 @@ class LexosApp(App):
         word, _, arg = text.partition(" ")
         arg = arg.strip()
         mode = self.current
-        if word in {"/rea", "/codex", "/chat", "/heretic"}:
+        if word in {"/rea", "/codex", "/chat", "/heretic", "/terminalcodex"}:
             self._go_mode(word[1:])
         elif word == "/aide":
             self._info(AIDE)
@@ -1176,6 +1404,21 @@ class LexosApp(App):
                         self._open_file(target)
                     else:
                         self._info(f"Fichier introuvable : {arg}", "error")
+        elif word == "/auto":
+            tc = self.modes["terminalcodex"]
+            box = tc.agent.tools  # type: ignore[union-attr]
+            box.auto_approve = not box.auto_approve
+            self._info("TerminalCodex : mode AUTO activé — les commandes partent sans demander "
+                       "(sauf les commandes dangereuses : sudo, rm -rf /, formatage…). "
+                       "/auto pour l'arrêter." if box.auto_approve
+                       else "TerminalCodex : mode AUTO arrêté — chaque commande redemande confirmation.")
+            self._refresh_status()
+        elif word == "/sudo":
+            if arg in {"off", "stop", "fin"}:
+                self._sudo_stop()
+                self._info("Session sudo fermée : le mot de passe sera redemandé (/sudo).")
+            else:
+                self._sudo_start()
         elif word == "/accueil":
             self.action_home()
         elif word == "/outils":
@@ -1302,11 +1545,26 @@ class LexosApp(App):
         except _Stopped:
             agent.messages[:] = snapshot  # pas d'appel d'outil laissé en suspens
             raise
-        self._ui(self._add_entry, mode,
-                 Entry("ai", answer or "(réponse vide)", label=mode.label))
+        self._type_out(mode, answer or "(réponse vide)")
+
+    def _type_out(self, mode: Mode, text: str) -> None:
+        """Écriture fluide : la réponse apparaît progressivement, comme si l'IA l'écrivait.
+        (Échap l'affiche d'un coup ; TILEX_SANS_ANIMATION=1 coupe l'effet.)"""
+        entry = self._ui(self._add_entry, mode, Entry("ai", "", label=mode.label))
+        if entry is None:
+            return
+        if self._animated and len(text) > 1:
+            step = max(2, len(text) // int(TYPE_SECONDS / 0.03))
+            for end in range(step, len(text), step):
+                if self._stop.is_set() or self._quitting:
+                    break
+                self._ui(self._paint, entry, text[:end])
+                time.sleep(0.03)
+        self._ui(self._paint, entry, text)
 
     # ------------------------------------------------------------------ fermeture
     def action_quit(self) -> None:
+        self._sudo_stop()
         self._quitting = True
         self._stop.set()
         self.exit()
