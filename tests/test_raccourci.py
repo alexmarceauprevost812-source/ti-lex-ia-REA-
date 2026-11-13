@@ -99,8 +99,11 @@ def _termux(tmp_path, *args):
     (fakebin / "curl").write_text("#!/usr/bin/env bash\nexit 7\n")      # le PC ne répond pas
     for f in fakebin.iterdir():
         f.chmod(0o755)
-    env = {**os.environ, "HOME": str(home), "PATH": f"{fakebin}:{os.environ['PATH']}",
-           "PREFIX": "/data/data/com.termux/files/usr", "TILEX_SKIP_PIP": "1",
+    prefix = tmp_path / "com.termux" / "usr"           # faux Termux, dans le dossier du test
+    (prefix / "bin").mkdir(parents=True, exist_ok=True)
+    env = {**os.environ, "HOME": str(home),
+           "PATH": f"{fakebin}:{prefix / 'bin'}:{os.environ['PATH']}",
+           "PREFIX": str(prefix), "TILEX_SKIP_PIP": "1",
            "TILEX_PYTHON": shutil.which("python3")}
     done = subprocess.run(["bash", str(repo / "scripts" / "installer-termux.sh"), *args],
                           capture_output=True, text=True, env=env)
@@ -111,7 +114,7 @@ def test_termux_installe_les_paquets_et_le_raccourci(tmp_path):
     done, home = _termux(tmp_path)
     assert done.returncode == 0, done.stderr
     assert "install -y python git curl" in (home / "pkg.log").read_text()
-    assert (home / ".local" / "bin" / "ti-lex").is_file()
+    assert (tmp_path / "com.termux" / "usr" / "bin" / "ti-lex").is_file()
     assert (tmp_path / "repo" / ".venv" / "bin" / "python").exists()
     assert "pkg install ollama" in done.stdout              # IA sur le téléphone : explique
     assert "OLLAMA_HOST" not in (home / ".bashrc").read_text()
@@ -125,3 +128,21 @@ def test_termux_avec_ip_du_pc_relancable_sans_doublon(tmp_path):
     assert texte.count('export OLLAMA_HOST="http://192.168.0.50:11434"') == 1
     assert "192.168.0.42" not in texte
     assert "ne répond pas" in done.stdout
+
+
+def test_termux_met_ti_lex_dans_le_path_de_termux(tmp_path):
+    prefix = tmp_path / "data" / "data" / "com.termux" / "files" / "usr"
+    (prefix / "bin").mkdir(parents=True)
+    repo = tmp_path / "repo"
+    (repo / "scripts").mkdir(parents=True)
+    shutil.copy(SCRIPT, repo / "scripts" / "installer-raccourci.sh")
+    home = tmp_path / "home"
+    home.mkdir()
+    env = {**os.environ, "HOME": str(home), "PREFIX": str(prefix),
+           "PATH": f"{prefix / 'bin'}:{os.environ['PATH']}"}
+    done = subprocess.run(["bash", str(repo / "scripts" / "installer-raccourci.sh")],
+                          capture_output=True, text=True, env=env)
+    assert done.returncode == 0, done.stderr
+    assert (prefix / "bin" / "ti-lex").is_file()
+    assert "ajouté au PATH" not in done.stdout              # rien à rouvrir
+    assert not (home / ".local" / "bin" / "ti-lex").exists()

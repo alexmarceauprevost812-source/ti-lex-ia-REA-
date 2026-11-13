@@ -10,6 +10,10 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BIN="${HOME}/.local/bin"
+# Dans Termux, le dossier des commandes ($PREFIX/bin) est toujours dans le PATH : on s'en sert.
+case "${PREFIX:-}" in
+    *com.termux*) BIN="${PREFIX}/bin" ;;
+esac
 
 mkdir -p "$BIN"
 cat > "$BIN/ti-lex" <<EOF

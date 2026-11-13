@@ -204,6 +204,9 @@ bash scripts/installer-termux.sh 192.168.0.42   # l'IP de ton PC : l'IA du PC, p
 exec bash && ti-lex
 ```
 
+Dans Termux, la commande `ti-lex` est installée dans le dossier des commandes de Termux
+(`$PREFIX/bin`), toujours dans le PATH : rien d'autre à configurer.
+
 - **IA du PC par le WiFi** (le plus puissant) : sur le PC, Ollama doit écouter le réseau
   (`OLLAMA_HOST=0.0.0.0 ollama serve`, ou `LEXOS_OLLAMA_BIND=0.0.0.0` avec la clé USB). Le script
   trouve tout seul le port (11435 pour la clé, 11434 sinon). Relance-le avec une autre IP si elle change.
