@@ -799,7 +799,7 @@ def test_animation_terminalcodex_le_mot_se_pose_au_centre():
 
 
 def test_entree_dans_terminalcodex_animation_puis_interface_avec_invite(tmp_path, monkeypatch):
-    monkeypatch.setattr(tui, "SPLASH_STEP", 0.004)
+    monkeypatch.setattr(tui, "SPLASH_STEP", 0.02)      # assez lent pour ne pas saturer l'interface
     monkeypatch.setattr(tui, "INTRO_HOLD", 0.3)
 
     async def go():
