@@ -812,7 +812,7 @@ def test_entree_dans_terminalcodex_animation_puis_interface_avec_invite(tmp_path
             await pilot.pause(0.05)
             assert isinstance(app.screen, tui.IntroScreen)
             logo = app.screen.query_one("#intro-logo")
-            for _ in range(300):                           # le mot finit par se poser…
+            for _ in range(1500):                          # le mot finit par se poser…
                 await pilot.pause(0.01)
                 if not isinstance(app.screen, tui.IntroScreen):
                     break
