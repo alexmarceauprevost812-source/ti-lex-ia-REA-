@@ -931,6 +931,12 @@ class LexosApp(App):
     #dialog-btns {{ height: 3; align: center middle; }}
     #dialog-btns Button {{ margin: 0 2; }}
     OptionList {{ background: {BLACK}; height: auto; max-height: 20; border: none; }}
+    #new-session {{ width: 1fr; height: 3; margin: 0 1; background: #06141c; color: {SKY};
+                    border: tall #0b2a3a; text-style: bold; }}
+    #new-session:hover {{ background: {SKY}; color: {BLACK}; }}
+    #sessions-list {{ height: auto; max-height: 12; background: {BLACK}; padding: 0 1; }}
+    #sessions-list > .option-list--option-highlighted {{ background: #0b2a3a; color: {WHITE}; }}
+    #files-head {{ margin-top: 1; }}
     """
 
     BINDINGS = [
@@ -1033,8 +1039,12 @@ class LexosApp(App):
         with Horizontal(id="body"):
             with Vertical(id="files"):
                 with Horizontal(classes="panel-head"):
-                    yield Static("📁 Fichiers", classes="panel-title")
+                    yield Static("💬 Sessions", classes="panel-title")
                     yield Button("✕", id="close-files", classes="close")
+                yield Button("＋ Nouvelle session", id="new-session")
+                yield OptionList(id="sessions-list")
+                with Horizontal(classes="panel-head", id="files-head"):
+                    yield Static("📁 Fichiers", classes="panel-title")
                 yield WorkspaceTree(str(self.base_config.workspace), id="tree")
             with Vertical(id="main"):
                 yield VerticalScroll(id="convo")
@@ -1057,6 +1067,7 @@ class LexosApp(App):
             pass
         self._render_transcript()
         self._refresh_status()
+        self._remplir_sessions()
         self.query_one("#prompt", Input).focus()
         if self._animated:
             self.set_interval(ANIM_STEP, self._anim_frame)
@@ -1575,7 +1586,50 @@ class LexosApp(App):
         chemin.write_text(json.dumps(data, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
         return nom
 
+    def _remplir_sessions(self) -> None:
+        import json
+        try:
+            lst = self.query_one("#sessions-list", OptionList)
+        except Exception:
+            return
+        lst.clear_options()
+        options = []
+        for f in self._liste_sessions():
+            try:
+                d = json.loads(f.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            titre = " ".join(str(d.get("resume") or d.get("nom") or f.stem).split())
+            if len(titre) > 22:
+                titre = titre[:21] + "…"
+            quand = str(d.get("date", ""))[5:16].replace("T", " ")
+            actif = "▸ " if f.stem == getattr(self, "_nom_auto", None) else "  "
+            options.append(Option(Text.assemble((actif + titre, WHITE), "\n", ("  " + quand, GREY)),
+                                  id=f.stem))
+        if options:
+            lst.add_options(options)
+        else:
+            lst.add_option(Option(Text("  (aucune pour l'instant)", style=GREY), id="__vide__",
+                                  disabled=True))
+
+    @on(Button.Pressed, "#new-session")
+    def _bouton_nouvelle(self) -> None:
+        self._commande_session("/nouvelle", "")
+        self.query_one("#prompt", Input).focus()
+
+    @on(OptionList.OptionSelected, "#sessions-list")
+    def _session_cliquee(self, event: OptionList.OptionSelected) -> None:
+        if event.option.id and event.option.id != "__vide__":
+            self._commande_session("/reprendre", event.option.id)
+        self.query_one("#prompt", Input).focus()
+
     def _commande_session(self, word, arg):
+        try:
+            self._commande_session_(word, arg)
+        finally:
+            self._remplir_sessions()
+
+    def _commande_session_(self, word, arg):
         import json
         if self.busy:
             self._info("Impossible pendant une réponse — Échap pour l'arrêter d'abord.", "error")
@@ -1603,10 +1657,11 @@ class LexosApp(App):
         elif word == "/nouvelle":
             ancienne = self._sauver_session(auto=True)
             for m in self.modes.values():
-                m.transcript.clear()
-                m.messages.clear()
                 if m.agent is not None:
                     m.agent.reset()
+                else:
+                    m.messages = [{"role": "system", "content": with_memory(m.system, m.config)}]
+                m.transcript = [self._welcome(m)]
             self._nom_auto = None
             self._render_transcript()
             self._refresh_status()
@@ -1645,6 +1700,7 @@ class LexosApp(App):
                         m.agent.messages[:] = saved["agent_messages"]
                     else:
                         m.agent.reset()
+            self._nom_auto = data.get("nom", cible.stem)
             courant = data.get("courant")
             if courant in self.modes:
                 self._go_mode(courant)
@@ -1797,6 +1853,11 @@ class LexosApp(App):
         self.busy = False
         self._activity = ""
         self._refresh_status()
+        try:
+            if self._sauver_session(auto=True):
+                self._remplir_sessions()
+        except Exception:
+            pass
 
     def _turn_chat(self, mode: Mode, text: str) -> None:
         mode.messages.append({"role": "user", "content": text})

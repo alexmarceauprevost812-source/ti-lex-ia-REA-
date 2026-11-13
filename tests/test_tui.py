@@ -941,3 +941,31 @@ def test_sessions_sauver_nouvelle_reprendre(tmp_path, monkeypatch):
             shown = list(app.query(".entry"))
             assert all(e.widget in shown for e in app.current.transcript)
     run(scenario())
+
+
+def test_panneau_sessions_bouton_et_liste(tmp_path, monkeypatch):
+    monkeypatch.setenv("LEXOS_SESSIONS_DIR", str(tmp_path / "sessions"))
+
+    async def scenario():
+        app, _ = make_app(tmp_path)
+        async with app.run_test(size=(140, 40)) as pilot:
+            await pilot.pause(0.2)
+            lst = app.query_one("#sessions-list")
+            assert lst.option_count == 1
+            await type_and_send(pilot, "/chat")
+            await pilot.pause(0.1)
+            await type_and_send(pilot, "salut")
+            await wait_idle(app, pilot)
+            assert lst.option_count == 1 and lst.get_option_at_index(0).id.startswith("auto-")
+            nom = lst.get_option_at_index(0).id
+            await pilot.click("#new-session")
+            await pilot.pause(0.2)
+            assert "salut" not in [e.text for e in app.modes["chat"].transcript]
+            assert app.modes["chat"].messages[0]["role"] == "system"
+            lst.focus()
+            lst.highlighted = 0
+            await pilot.press("enter")
+            await pilot.pause(0.3)
+            assert "salut" in [e.text for e in app.modes["chat"].transcript if e.kind == "user"]
+            assert app._nom_auto == nom
+    run(scenario())
