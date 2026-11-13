@@ -138,6 +138,33 @@ défauts : `llama3.2:1b`, `qwen2.5-coder:1.5b`, `qwen2.5:3b`) et te dit quoi fai
 manque. Le repli du mode Heretic n'est **pas décensuré** — un petit modèle ne peut pas hériter
 d'Heretic sans qu'Heretic tourne dessus, ce qui prend une vraie carte graphique.
 
+## Interface plein écran (REA, Codex, Chat)
+
+```bash
+bash scripts/installer-raccourci.sh   # une seule fois : crée la commande « ti-lex »
+ti-lex                                # ouvre l'interface, depuis n'importe quel terminal
+ti-lex --workspace ~/projet           # choisir le dossier de travail
+```
+
+(Sans le raccourci : `lexos-tui`, après `pip install -e .` et avec le venv activé. Par défaut
+`ti-lex` prend `marceau-ia` pour REA et Codex et `asselin` pour Chat — changeable avec
+`TILEX_REA_MODEL`, `TILEX_CODEX_MODEL`, `TILEX_CHAT_MODEL`.)
+
+Une seule fenêtre de terminal pour REA, Codex et Chat : **seul le moteur change** (modèle,
+outils, consigne). Heretic reste dans le menu `lexos-ia`, inchangé.
+
+- Thème noir : ce que tu écris en blanc, les réponses de l'IA en bleu ciel, le code en couleurs néon.
+- Onglets REA / Codex / Chat (clic, `Ctrl+T`, ou `/rea` `/codex` `/chat`) — chaque mode garde sa
+  propre conversation.
+- Panneau de fichiers à gauche (`Ctrl+B`) : un clic sur un fichier l'ouvre dans l'aperçu coloré à
+  droite (`Ctrl+O`). Quand REA écrit un fichier, il apparaît dans la liste et s'ouvre tout seul.
+- `Ctrl+P` (ou `/model`) change le moteur du mode en cours ; `Échap` arrête une réponse ;
+  `Ctrl+N` efface la conversation ; `Ctrl+Q` quitte ; `/aide` liste tout.
+- Animations légères : le logo LEXOS brille en néon, et pendant que le modèle travaille un
+  indicateur tourne avec le temps écoulé. `TILEX_SANS_ANIMATION=1 ti-lex` les coupe.
+- Même mémoire partagée (`/retenir`), mêmes variables `TILEX_*_MODEL`, mêmes modèles de repli que
+  le menu. Écraser un fichier ou lancer une commande ouvre une fenêtre de confirmation.
+
 ## Mémoire partagée
 
 Les 4 modes lisent et complètent le **même** fichier (`memoire-ia.md`, à côté du dossier de

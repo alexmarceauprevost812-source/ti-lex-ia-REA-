@@ -3,7 +3,7 @@ name = "ti-lex-agent"
 version = "0.1.0"
 description = "Agent local Ti-Lex : web, vision et fichiers avec des modèles Ollama"
 requires-python = ">=3.10"
-dependencies = ["requests>=2.31", "ddgs>=9.0"]
+dependencies = ["requests>=2.31", "ddgs>=9.0", "textual>=1.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
@@ -14,6 +14,8 @@ ti-lex-agent = "ti_lex_agent.cli:main"
 # existante (PySide6) et entrait en conflit avec elle.
 lexos-ia = "ti_lex_agent.launcher:main"
 lexos-gui = "ti_lex_agent.gui:main"
+# Interface plein écran : REA, Codex et Chat dans la même fenêtre (Heretic reste dans lexos-ia).
+lexos-tui = "ti_lex_agent.tui:main"
 
 [build-system]
 requires = ["setuptools>=68"]
