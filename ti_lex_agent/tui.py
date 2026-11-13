@@ -31,6 +31,39 @@ from pygments.token import (Comment, Error, Generic, Keyword, Name, Number, Oper
 from rich import box
 from rich.console import Group, RenderableType
 from rich.markdown import Markdown
+
+import re as _re
+import shutil as _shutil
+import subprocess as _subprocess
+
+_FENCE = chr(96) * 3
+_BLOC_CODE = _re.compile(_FENCE + r"[^\n]*\n(.*?)" + _FENCE, _re.S)
+
+
+def presse_papiers_ecrire(texte: str) -> bool:
+    # Copie dans le presse-papiers du systeme (Wayland, puis X11)
+    for cmd in (["wl-copy"], ["xclip", "-selection", "clipboard"]):
+        if _shutil.which(cmd[0]):
+            try:
+                _subprocess.run(cmd, input=texte.encode("utf-8"), check=True, timeout=3,
+                                stdout=_subprocess.DEVNULL, stderr=_subprocess.DEVNULL)
+                return True
+            except Exception:
+                continue
+    return False
+
+
+def presse_papiers_lire() -> str:
+    for cmd in (["wl-paste", "--no-newline"], ["xclip", "-selection", "clipboard", "-o"]):
+        if _shutil.which(cmd[0]):
+            try:
+                r = _subprocess.run(cmd, capture_output=True, timeout=3)
+                if r.returncode == 0:
+                    return r.stdout.decode("utf-8", "replace")
+            except Exception:
+                continue
+    return ""
+
 from rich.panel import Panel
 from rich.syntax import PygmentsSyntaxTheme, Syntax
 from rich.text import Text
@@ -939,7 +972,7 @@ class LexosApp(App):
             ("rea", "REA", _env_model("TILEX_REA_MODEL", "heretic:latest"),
              _env_model("TILEX_REA_FALLBACK", FALLBACK_REA), "", True),
             ("codex", "Codex", _env_model("TILEX_CODEX_MODEL", "qwen2.5-coder:7b"),
-             _env_model("TILEX_CODEX_FALLBACK", FALLBACK_CODEX), CODEX_SYSTEM, False),
+             _env_model("TILEX_CODEX_FALLBACK", FALLBACK_CODEX), CODEX_SYSTEM + "\n\nTu as des outils. Quand on te demande de créer un programme ou un fichier, crée-le vraiment avec write_file, en entier et jamais en morceaux « à ajouter », puis teste-le avec run_command et corrige les erreurs avant de répondre.", True),
             ("chat", "Chat", _env_model("TILEX_CHAT_MODEL", "qwen3-vl:4b"),
              _env_model("TILEX_CHAT_FALLBACK", FALLBACK_CHAT), CHAT_SYSTEM, False),
             # TerminalCodex : l'IA locale choisit et lance les commandes (avec ta confirmation).
@@ -1187,7 +1220,43 @@ class LexosApp(App):
     def _mount_entry(self, entry: Entry) -> None:
         widget = Static(self._render_entry(entry), classes="entry")
         entry.widget = widget
+        widget.entry = entry
         self.chat.mount(widget)
+
+    def on_mouse_down(self, event) -> None:
+        # Clic droit : sur une reponse = copier son code ; dans la zone de saisie = coller
+        if getattr(event, "button", 1) != 3:
+            return
+        try:
+            widget, _ = self.get_widget_at(event.screen_x, event.screen_y)
+        except Exception:
+            return
+        w = widget
+        while w is not None and getattr(w, "id", None) != "prompt":
+            w = w.parent
+        if w is not None:
+            texte = presse_papiers_lire().replace("\r", "").replace("\n", " ")
+            if texte:
+                w.focus()
+                w.insert_text_at_cursor(texte)
+            event.stop()
+            return
+        w = widget
+        entry = None
+        while w is not None:
+            entry = getattr(w, "entry", None)
+            if entry is not None:
+                break
+            w = w.parent
+        if entry is None:
+            return
+        blocs = [b.strip("\n") for b in _BLOC_CODE.findall(entry.text or "")]
+        texte = "\n\n".join(blocs) if blocs else (entry.text or "")
+        if texte and presse_papiers_ecrire(texte):
+            self.notify("Code copié" if blocs else "Texte copié", timeout=2)
+        else:
+            self.notify("Copie impossible", severity="error", timeout=3)
+        event.stop()
 
     def _render_transcript(self) -> None:
         for e in self.current.transcript:

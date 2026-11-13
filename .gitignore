@@ -8,3 +8,11 @@ venv/
 workspace/
 models/
 output/
+
+# Sauvegardes, essais et fichiers personnels
+*.bak
+*.bak2
+essais-codex-wifi/
+checkpoints/
+memoire-ia.md
+outils-crees.json
