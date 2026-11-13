@@ -44,14 +44,15 @@ from textual.widgets import Button, DirectoryTree, Footer, Input, OptionList, St
 from textual.widgets.option_list import Option
 
 from . import outils
-from .agent import Agent, terminal_system_prompt
+from .agent import Agent, programmeur_system_prompt, terminal_system_prompt
 from .config import Config
 from .launcher import (CHAT_SYSTEM, CODEX_SYSTEM, FALLBACK_CHAT, FALLBACK_CODEX,
                        FALLBACK_REA, _env_model, _has_model)
 from .memory import remember, with_memory
 from .ollama_client import OllamaClient, OllamaError
 from .params import DEFAULTS, describe, set_param
-from .tools import TERMINAL_TOOL_SCHEMAS, ToolError, resolve_workspace_path
+from .tools import (PROGRAMMEUR_TOOL_SCHEMAS, TERMINAL_TOOL_SCHEMAS, ToolError,
+                    resolve_workspace_path)
 
 # --------------------------------------------------------------------------- couleurs
 BLACK = "#000000"
@@ -425,6 +426,7 @@ MENU_CHOICES = [
     ("codex", "Codex", "assistant de programmation"),
     ("chat", "Chat", "conversation générale"),
     ("terminalcodex", "TerminalCodex", "écris ce que tu veux : l'IA lance les commandes"),
+    ("programmeur", "Programme IA outils", "décris un outil : l'IA le programme et le range"),
     ("outils", "Outils créés", "ta bibliothèque d'outils"),
     ("cloner", "Cloner un projet GitHub", "copie un dépôt dans ton dossier de travail"),
     ("nouveau", "Nouveau projet", "démarre un projet vide"),
@@ -540,7 +542,7 @@ class SplashScreen(Screen[str]):
             yield Static("", id="splash-logo")
             yield Static(Text("LexOS Pro — ton terminal IA", style=GREY), id="splash-sub")
             yield OptionList(id="splash-menu")
-            yield Static(Text("↑↓ puis Entrée · chiffres 1-8 · Échap passe l'animation",
+            yield Static(Text("↑↓ puis Entrée · chiffres 1-9 · Échap passe l'animation",
                               style=GREY), id="splash-hint")
 
     def on_mount(self) -> None:
@@ -635,7 +637,7 @@ SKIP_DIRS = {".git", "__pycache__", ".venv", "venv", "node_modules", ".pytest_ca
 MAX_VIEW_BYTES = 300_000
 
 AIDE = """\
-Modes        Ctrl+T (suivant) · /rea · /codex · /chat · /terminalcodex · clic sur l'onglet
+Modes        Ctrl+T (suivant) · /rea · /codex · /chat · /terminalcodex · /programme · clic
 Panneaux     Ctrl+B fichiers · Ctrl+O aperçu · /fichiers · /apercu · clic sur ✕
 Moteur       Ctrl+P ou /model (liste) · /model <nom>
 Fichiers     clic sur un fichier = ouvre l'aperçu · /ouvrir <chemin>
@@ -854,6 +856,10 @@ class LexosApp(App):
             # TerminalCodex : l'IA locale choisit et lance les commandes (avec ta confirmation).
             ("terminalcodex", "TerminalCodex", _env_model("TILEX_TERMINAL_MODEL", "qwen3:8b"),
              _env_model("TILEX_TERMINAL_FALLBACK", FALLBACK_REA), terminal_system_prompt(), True),
+            # Programme IA outils : l'IA écrit, teste et range des outils dans la bibliothèque.
+            ("programmeur", "Programme IA", _env_model("TILEX_PROGRAMMEUR_MODEL", "qwen3:8b"),
+             _env_model("TILEX_PROGRAMMEUR_FALLBACK", FALLBACK_CODEX),
+             programmeur_system_prompt(), True),
         ]
         for key, label, primary, fallback, system, tools in specs:
             cfg = Config(ollama_host=base.ollama_host, model=primary,
@@ -862,11 +868,12 @@ class LexosApp(App):
             mode = Mode(key, label, primary, fallback, system, tools, cfg, client,
                         dict(DEFAULTS))
             if tools:
-                terminal = key == "terminalcodex"
+                schemas = {"terminalcodex": TERMINAL_TOOL_SCHEMAS,
+                           "programmeur": PROGRAMMEUR_TOOL_SCHEMAS}.get(key)
                 mode.agent = Agent(cfg, client=client, confirm=self._confirm,
                                    options=mode.options,
                                    system_prompt=system or None,
-                                   tool_schemas=TERMINAL_TOOL_SCHEMAS if terminal else None)
+                                   tool_schemas=schemas)
                 self._wrap_tools(mode)
             else:
                 mode.messages = [{"role": "system", "content": with_memory(system, cfg)}]
@@ -882,6 +889,9 @@ class LexosApp(App):
             "terminalcodex": ("écris ce que tu veux faire, l'IA locale trouve et lance les "
                               "commandes\n(chaque commande te demande confirmation ; /auto pour "
                               "ne plus demander)"),
+            "programmeur": ("décris l'outil que tu veux : l'IA locale l'écrit dans outils/, le "
+                            "teste, puis l'ajoute à ta bibliothèque\n(ex : « un outil qui "
+                            "sauvegarde mon dossier Documents dans une archive datée »)"),
         }[mode.key]
         where = str(mode.config.workspace)
         home = str(Path.home())
@@ -895,7 +905,8 @@ class LexosApp(App):
         with Horizontal(id="top"):
             yield Static(brand_text(2 * len(BRAND), False), id="brand")   # au repos, sans éclat
             yield Tabs(Tab("REA", id="rea"), Tab("Codex", id="codex"),
-                       Tab("Chat", id="chat"), Tab("TerminalCodex", id="terminalcodex"), id="tabs")
+                       Tab("Chat", id="chat"), Tab("TerminalCodex", id="terminalcodex"),
+                       Tab("Programme IA", id="programmeur"), id="tabs")
         with Horizontal(id="body"):
             with Vertical(id="files"):
                 with Horizontal(classes="panel-head"):
@@ -1313,7 +1324,7 @@ class LexosApp(App):
 
     def _finish_tool(self, mode: Mode, entry: Entry, name: str, args: dict, result: str) -> None:
         self._paint(entry, detail=summarize_result(result))
-        if name in {"write_file", "run_command", "run_shell", "run_library_tool"}:
+        if name in {"write_file", "run_command", "run_shell", "run_library_tool", "save_tool"}:
             self._reload_tree()
         if name in {"write_file", "read_file"} and not result.startswith("Erreur"):
             try:
@@ -1372,6 +1383,8 @@ class LexosApp(App):
         mode = self.current
         if word in {"/rea", "/codex", "/chat", "/terminalcodex"}:
             self._go_mode(word[1:])
+        elif word in {"/programme", "/programmeur"}:
+            self._go_mode("programmeur")
         elif word == "/aide":
             self._info(AIDE)
         elif word in {"/quit", "/exit", "/menu"}:
@@ -1396,13 +1409,14 @@ class LexosApp(App):
                     else:
                         self._info(f"Fichier introuvable : {arg}", "error")
         elif word == "/auto":
-            tc = self.modes["terminalcodex"]
+            key = mode.key if mode.key in {"terminalcodex", "programmeur"} else "terminalcodex"
+            tc = self.modes[key]
             box = tc.agent.tools  # type: ignore[union-attr]
             box.auto_approve = not box.auto_approve
-            self._info("TerminalCodex : mode AUTO activé — les commandes partent sans demander "
+            self._info(f"{tc.label} : mode AUTO activé — les commandes partent sans demander "
                        "(sauf les commandes dangereuses : sudo, rm -rf /, formatage…). "
                        "/auto pour l'arrêter." if box.auto_approve
-                       else "TerminalCodex : mode AUTO arrêté — chaque commande redemande confirmation.")
+                       else f"{tc.label} : mode AUTO arrêté — chaque commande redemande confirmation.")
             self._refresh_status()
         elif word == "/sudo":
             if arg in {"off", "stop", "fin"}:

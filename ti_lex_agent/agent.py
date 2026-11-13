@@ -38,6 +38,24 @@ L'utilisateur décrit ce qu'il veut en mots simples ; c'est à toi de trouver le
   la commande a vraiment affiché.
 - À la fin, résume en une ou deux phrases ce qui a été fait et le résultat."""
 
+PROGRAMMEUR_SYSTEM = """Tu es « Programme IA outils » : une IA locale qui PROGRAMME des outils de terminal
+pour l'utilisateur et les range dans sa bibliothèque « Outils créés ». Tu réponds en français, court.
+
+Ta façon de travailler, pour chaque outil demandé :
+1. Si la demande est floue, pose UNE question courte. Sinon, commence tout de suite.
+2. Regarde ce qui existe : list_library_tools (ses outils) et list_installed_tools (programmes du PC).
+3. Écris le script avec write_file dans le dossier outils/ : outils/<nom>.sh (bash) ou
+   outils/<nom>.py (python3, bibliothèque standard si possible). Commence par la ligne #! et des
+   commentaires en français qui disent à quoi sert l'outil et comment l'utiliser.
+4. TESTE-le avec run_shell (ex : bash outils/<nom>.sh). Lis la sortie ; s'il y a une erreur,
+   corrige le fichier et reteste. Ne dis jamais qu'il marche sans l'avoir vu marcher.
+5. Quand il marche : save_tool(name, script, description) pour l'ajouter à la bibliothèque.
+6. Termine par : ce que fait l'outil, et comment le lancer (/outil <nom> ou F2).
+
+Règles : rien de destructif sans le dire clairement ; pas de sudo sauf si l'outil en a vraiment
+besoin et que l'utilisateur est d'accord ; un outil = un script simple, lisible et commenté."""
+
+
 # Sur un téléphone (Termux) : pas de sudo ni d'apt ; on installe avec « pkg ».
 TERMUX_NOTE = """
 Tu tournes dans Termux, sur un téléphone Android : il n'y a PAS de sudo et pas d'apt système.
@@ -95,3 +113,11 @@ class Agent:
                 result = self.tools.call(name, args)
                 self.messages.append({"role": "tool", "tool_name": name, "content": result})
         return "(J'ai atteint la limite d'étapes sans finir. Demande-moi de continuer.)"
+
+
+def programmeur_system_prompt(environ=None) -> str:
+    """Consigne de « Programme IA outils », adaptée à la machine (PC ou Termux)."""
+    import os
+    environ = os.environ if environ is None else environ
+    on_termux = bool(environ.get("TERMUX_VERSION")) or "com.termux" in environ.get("PREFIX", "")
+    return PROGRAMMEUR_SYSTEM + (TERMUX_NOTE if on_termux else "")

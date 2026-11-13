@@ -167,7 +167,7 @@ Une seule fenêtre de terminal pour REA, Codex, Chat et TerminalCodex : **seul l
   indicateur tourne avec le temps écoulé. `TILEX_SANS_ANIMATION=1 ti-lex` les coupe.
 - **Accueil animé** : au lancement, les lettres « TI-LEX » arrivent du ciel à 45° et se posent
   bien droit sur une ligne (« TI- » en blanc, « LEX » en orange néon), puis les choix du menu arrivent un par
-  un. `Échap` passe l'animation, les chiffres `1`-`8` choisissent, `/accueil` y revient.
+  un. `Échap` passe l'animation, les chiffres `1`-`9` choisissent, `/accueil` y revient.
 - **TerminalCodex** (onglet, `/terminalcodex`, choix 4 de l'accueil) : tu écris ce que tu veux en
   mots simples, l'IA locale trouve les commandes et les lance dans ton dossier de travail. Elle
   connaît les programmes installés et ta bibliothèque « Outils créés ». Chaque commande te demande
@@ -182,6 +182,12 @@ Une seule fenêtre de terminal pour REA, Codex, Chat et TerminalCodex : **seul l
   - Sur un téléphone (Termux), il installe avec `pkg install` au lieu de `sudo apt`.
 - **Couleurs et écriture** : l'IA écrit en orange néon, les commandes lancées sont en jaune or, et
   les réponses de REA et TerminalCodex s'écrivent de façon fluide (Échap les affiche d'un coup).
+- **Programme IA outils** (onglet « Programme IA », `/programme`, choix 5 de l'accueil) : tu décris
+  l'outil que tu veux (« un outil qui sauvegarde mon dossier Documents dans une archive datée »).
+  L'IA locale écrit le script dans `outils/` (bash ou python3, commenté en français), le teste,
+  le corrige jusqu'à ce qu'il marche, puis l'ajoute à ta bibliothèque « Outils créés ». Tu le lances
+  ensuite avec `/outil <nom>` ou `F2`. Mêmes protections que TerminalCodex (confirmation, `/auto`).
+  Modèle : `TILEX_PROGRAMMEUR_MODEL` (défaut `qwen3:8b`).
 - **Outils créés** (`F2` ou `/outils`) : ta bibliothèque d'outils de terminal.
   `/ajouter-outil sauvegarde = bash ~/scripts/backup.sh` l'ajoute, `/outil sauvegarde` le lance
   (l'interface se met de côté le temps que l'outil tourne, puis revient), `/retirer-outil` l'enlève.

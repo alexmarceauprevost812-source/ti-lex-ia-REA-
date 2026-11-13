@@ -398,3 +398,39 @@ _TERMINAL_NEW = [
 _TERMINAL_KEEP = {"list_files", "read_file", "write_file", "web_search", "fetch_page"}
 TERMINAL_TOOL_SCHEMAS: list[dict] = (
     _TERMINAL_NEW + [t for t in TOOL_SCHEMAS if t["function"]["name"] in _TERMINAL_KEEP])
+
+
+# ------------------------------------------------------------------ Programme IA outils
+INTERPRETERS = {".sh": "bash", ".bash": "bash", ".py": "python3"}
+
+
+def _tool_save_tool(self, name: str, script: str, description: str = "") -> str:
+    """Ajoute un script du dossier de travail à la bibliothèque « Outils créés »."""
+    from . import outils
+    target = self._resolve(script)
+    if not target.is_file():
+        raise ToolError(f"Script introuvable : {script} (écris-le d'abord avec write_file).")
+    target.chmod(target.stat().st_mode | 0o755)
+    runner = INTERPRETERS.get(target.suffix.lower())
+    command = f"{runner} {shlex.quote(str(target))}" if runner else shlex.quote(str(target))
+    try:
+        message = outils.add(self.config, name, command, description)
+    except outils.OutilError as e:
+        raise ToolError(str(e)) from e
+    return (f"{message} Commande : {command}\n"
+            f"L'utilisateur le lance avec /outil {name.strip()} ou F2.")
+
+
+Toolbox.tool_save_tool = _tool_save_tool
+
+PROGRAMMEUR_TOOL_SCHEMAS: list[dict] = TERMINAL_TOOL_SCHEMAS + [
+    {"type": "function", "function": {
+        "name": "save_tool",
+        "description": ("Ajoute un script terminé et TESTÉ à la bibliothèque « Outils créés » de "
+                        "l'utilisateur, sous un nom court. À appeler seulement quand le script marche."),
+        "parameters": {"type": "object", "properties": {
+            "name": {"type": "string", "description": "Nom court de l'outil (ex : sauvegarde)"},
+            "script": {"type": "string", "description": "Chemin du script dans le dossier de travail (ex : outils/sauvegarde.sh)"},
+            "description": {"type": "string", "description": "Ce que fait l'outil, en une phrase"},
+        }, "required": ["name", "script"]}}},
+]

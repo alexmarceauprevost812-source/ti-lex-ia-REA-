@@ -129,3 +129,10 @@ def test_terminalcodex_sur_telephone_termux_utilise_pkg_sans_sudo():
     termux = terminal_system_prompt({"TERMUX_VERSION": "0.118", "PREFIX": "/data/data/com.termux/files/usr"})
     assert "pkg install" in termux and "PAS de sudo" in termux
     assert "pkg install" in terminal_system_prompt({"PREFIX": "/data/data/com.termux/files/usr"})
+
+
+def test_programme_ia_sur_termux_utilise_pkg():
+    from ti_lex_agent.agent import PROGRAMMEUR_SYSTEM, programmeur_system_prompt
+    assert programmeur_system_prompt({}) == PROGRAMMEUR_SYSTEM
+    assert "save_tool" in PROGRAMMEUR_SYSTEM and "TESTE" in PROGRAMMEUR_SYSTEM
+    assert "pkg install" in programmeur_system_prompt({"TERMUX_VERSION": "0.118"})

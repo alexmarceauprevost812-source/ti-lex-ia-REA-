@@ -132,7 +132,7 @@ def test_starts_black_in_rea_with_all_tabs(tmp_path):
         async with app.run_test(size=(140, 40)) as pilot:
             await pilot.pause(0.2)
             assert app.current.key == "rea"
-            assert [t.id for t in app.query("Tab")] == ["rea", "codex", "chat", "terminalcodex"]
+            assert [t.id for t in app.query("Tab")] == ["rea", "codex", "chat", "terminalcodex", "programmeur"]
             assert app.theme == "lexos-noir"
             assert app.screen.styles.background.hex.lower() == "#000000"
             assert app.focused.id == "prompt"
@@ -548,7 +548,7 @@ def test_accueil_echap_passe_l_animation_et_cloner_prepare_la_commande(tmp_path)
             await pilot.press("escape")
             await pilot.pause()
             assert app.screen.query_one("#splash-menu").option_count == len(tui.MENU_CHOICES)
-            await pilot.press("6")
+            await pilot.press("7")
             await pilot.pause()
             assert app.query_one("#prompt", Input).value == "/cloner "
     run(go())
@@ -834,3 +834,52 @@ def test_logo_lex_en_blanc_os_en_orange_neon():
     assert repos.plain == "LEXOS"
     couleurs = [str(sp.style) for sp in repos.spans]
     assert couleurs == [f"bold {tui.WHITE}"] * 3 + [f"bold {tui.NEON_ORANGE}"] * 2
+
+
+# ------------------------------------------------------------------ Programme IA outils
+def test_programme_ia_ecrit_teste_et_range_un_outil(tmp_path):
+    script = "#!/usr/bin/env bash\n# Dit bonjour.\necho bonjour-outil\n"
+    FakeClient.script = [
+        _appel("write_file", path="outils/bonjour.sh", content=script),
+        _appel("run_shell", command="bash outils/bonjour.sh"),
+        _appel("save_tool", name="bonjour", script="outils/bonjour.sh", description="dit bonjour"),
+        {"role": "assistant", "content": "L'outil « bonjour » est prêt : /outil bonjour."},
+    ]
+
+    async def go():
+        app, ws = make_app(tmp_path, resolve_models=False, splash=True)
+        async with app.run_test(size=(140, 40)) as pilot:
+            await pilot.pause()
+            await pilot.press("escape")                    # accueil : passe l'animation
+            await pilot.pause()
+            await pilot.press("5")                         # 5e choix : Programme IA outils
+            await pilot.pause(0.2)
+            assert app.current.key == "programmeur"
+            assert "save_tool" in [t["function"]["name"] for t in app.current.agent.tool_schemas]
+            await type_and_send(pilot, "/auto")
+            await type_and_send(pilot, "fais-moi un outil qui dit bonjour")
+            await wait_idle(app, pilot)
+            # le script est écrit, testé, exécutable…
+            assert (ws / "outils" / "bonjour.sh").read_text() == script
+            resultats = [m["content"] for m in app.current.agent.messages if m.get("role") == "tool"]
+            assert "bonjour-outil" in resultats[1]
+            # …et rangé dans la bibliothèque, où on peut le lancer
+            from ti_lex_agent import outils
+            tool = outils.find(app.base_config, "bonjour")
+            assert tool["description"] == "dit bonjour" and tool["commande"].startswith("bash ")
+            assert outils.run_captured(app.base_config, tool["commande"]) == (0, "bonjour-outil")
+            assert entry_kinds(app, "programmeur")[-1] == "ai"
+    run(go())
+
+
+def test_save_tool_refuse_script_absent_ou_hors_du_dossier(tmp_path):
+    from ti_lex_agent.config import Config
+    from ti_lex_agent.tools import Toolbox
+    box = Toolbox(Config(workspace=tmp_path / "ws"), client=None, confirm=lambda _q: True)
+    assert "introuvable" in box.call("save_tool", {"name": "x", "script": "outils/absent.sh"})
+    assert box.call("save_tool", {"name": "x", "script": "../../etc/passwd"}).startswith("Erreur")
+    (tmp_path / "ws" / "outils").mkdir(parents=True)
+    (tmp_path / "ws" / "outils" / "a.py").write_text("print('py-ok')\n")
+    assert "ajouté" in box.call("save_tool", {"name": "py", "script": "outils/a.py"})
+    from ti_lex_agent import outils
+    assert outils.find(box.config, "py")["commande"].startswith("python3 ")
