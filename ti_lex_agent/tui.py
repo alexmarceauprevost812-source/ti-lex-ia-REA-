@@ -415,6 +415,95 @@ TERMINALCODEX_LOGO = Logo(
     ],
 )
 
+PROGRAMMEUR_LOGO = Logo(
+    width=71, white=9,   # « Programme » en blanc, « IA » en orange néon
+    letters=[
+        [   # P
+            '    ____',
+            '   / __ \\',
+            '  / /_/ /',
+            ' / ____/',
+            '/_/',
+        ],
+        [   # r
+            '',
+            '         _____',
+            '          ___/',
+            '         /',
+            '      /_/',
+        ],
+        [   # o
+            '',
+            '              ____',
+            '               __ \\',
+            '            / /_/ /',
+            '            \\____/',
+        ],
+        [   # g
+            '',
+            '                    ____ _',
+            '                   / __ `/',
+            '                    /_/ /',
+            '                  \\__, /',
+        ],
+        [   # r
+            '',
+            '                          _____',
+            '                           ___/',
+            '                          /',
+            '                        _/',
+        ],
+        [   # a
+            '',
+            '                               ____ _',
+            '                                __ `/',
+            '                             / /_/ /',
+            '                             \\__,_/',
+        ],
+        [   # m
+            '',
+            '                                     ____ ___',
+            '                                      __ `__ \\',
+            '                                     / / / / /',
+            '                                   _/ /_/ /_/',
+        ],
+        [   # m
+            '',
+            '                                               ____ ___',
+            '                                              / __ `__ \\',
+            '                                               / / / / /',
+            '                                             _/ /_/ /_/',
+        ],
+        [   # e
+            '',
+            '                                                         ___',
+            '                                                        / _ \\',
+            '                                                          __/',
+            '                                                       \\___/',
+        ],
+        [   # I
+            '                                                               ____',
+            '                                                              /  _/',
+            '                                                              / /',
+            '                                                             / /',
+            '                                                            ___/',
+        ],
+        [   # A
+            '                                                                   ___',
+            '                                                                      |',
+            '                                                                 / /| |',
+            '                                                                / ___ |',
+            '                                                                _/  |_|',
+        ],
+    ],
+)
+
+# Animation jouée à la première entrée dans un outil : (logo, sous-titre).
+INTROS = {
+    "terminalcodex": (TERMINALCODEX_LOGO, "l'IA locale qui lance les commandes pour toi"),
+    "programmeur": (PROGRAMMEUR_LOGO, "l'IA locale qui programme tes outils"),
+}
+
 SPLASH_ROWS = 12            # hauteur du « ciel » ; le mot se pose tout en bas, bien droit
 SPLASH_GAP = 3              # images d'écart entre deux lettres qui tombent
 SPLASH_SLIDE = 2            # colonnes par ligne de chute : 2 ≈ une descente à 45°
@@ -1170,11 +1259,11 @@ class LexosApp(App):
             self._render_transcript()
             self._refresh_status()
             self.query_one("#prompt", Input).focus()
-            if tab_id == "terminalcodex" and self.splash and tab_id not in self._intro_seen:
+            if tab_id in INTROS and self.splash and tab_id not in self._intro_seen:
                 self._intro_seen.add(tab_id)
+                logo, subtitle = INTROS[tab_id]
                 self.push_screen(
-                    IntroScreen(TERMINALCODEX_LOGO, "l'IA locale qui lance les commandes pour toi",
-                                animated=self._animated),
+                    IntroScreen(logo, subtitle, animated=self._animated),
                     lambda _=None: self.query_one("#prompt", Input).focus())
 
     def _go_mode(self, key: str) -> None:

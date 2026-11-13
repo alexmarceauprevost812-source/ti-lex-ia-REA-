@@ -187,7 +187,8 @@ Une seule fenêtre de terminal pour REA, Codex, Chat et TerminalCodex : **seul l
   L'IA locale écrit le script dans `outils/` (bash ou python3, commenté en français), le teste,
   le corrige jusqu'à ce qu'il marche, puis l'ajoute à ta bibliothèque « Outils créés ». Tu le lances
   ensuite avec `/outil <nom>` ou `F2`. Mêmes protections que TerminalCodex (confirmation, `/auto`).
-  Modèle : `TILEX_PROGRAMMEUR_MODEL` (défaut `qwen3:8b`).
+  Modèle : `TILEX_PROGRAMMEUR_MODEL` (défaut `qwen3:8b`). À la première ouverture, « ProgrammeIA »
+  tombe du ciel et reste 2 secondes au centre de l'écran, comme TerminalCodex.
 - **Outils créés** (`F2` ou `/outils`) : ta bibliothèque d'outils de terminal.
   `/ajouter-outil sauvegarde = bash ~/scripts/backup.sh` l'ajoute, `/outil sauvegarde` le lance
   (l'interface se met de côté le temps que l'outil tourne, puis revient), `/retirer-outil` l'enlève.

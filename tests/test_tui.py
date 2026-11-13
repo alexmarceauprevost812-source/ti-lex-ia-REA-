@@ -853,6 +853,8 @@ def test_programme_ia_ecrit_teste_et_range_un_outil(tmp_path):
             await pilot.press("escape")                    # accueil : passe l'animation
             await pilot.pause()
             await pilot.press("5")                         # 5e choix : Programme IA outils
+            await pilot.pause(0.05)
+            await pilot.press("space")                     # passe l'animation d'entrée
             await pilot.pause(0.2)
             assert app.current.key == "programmeur"
             assert "save_tool" in [t["function"]["name"] for t in app.current.agent.tool_schemas]
@@ -883,3 +885,29 @@ def test_save_tool_refuse_script_absent_ou_hors_du_dossier(tmp_path):
     assert "ajouté" in box.call("save_tool", {"name": "py", "script": "outils/a.py"})
     from ti_lex_agent import outils
     assert outils.find(box.config, "py")["commande"].startswith("python3 ")
+
+
+def test_animation_programme_ia_le_mot_se_pose_au_centre():
+    logo = tui.PROGRAMMEUR_LOGO
+    assert len(logo.letters) == len("ProgrammeIA") and logo.white == len("Programme")
+    fin = tui.splash_frame(tui.splash_done_tick(logo) + 10, logo, True).plain.splitlines()
+    assert fin[-1].rstrip() == "/_/   /_/   \\____/\\__, /_/   \\__,_/_/ /_/ /_/_/ /_/ /_/\\___/___/_/  |_|"
+    assert all(len(ligne) == logo.width for ligne in fin)
+
+
+def test_entree_dans_programme_ia_joue_son_animation(tmp_path):
+    async def go():
+        app, _ = make_app(tmp_path, resolve_models=False, splash=True)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            await pilot.press("escape")
+            await pilot.pause()
+            await pilot.press("5")                         # Programme IA outils
+            await pilot.pause(0.05)
+            assert isinstance(app.screen, tui.IntroScreen)
+            assert app.screen.logo is tui.PROGRAMMEUR_LOGO
+            await pilot.press("space")                     # une touche passe l'animation
+            await pilot.pause(0.1)
+            assert not isinstance(app.screen, tui.IntroScreen)
+            assert app.current.key == "programmeur" and app.focused.id == "prompt"
+    run(go())
