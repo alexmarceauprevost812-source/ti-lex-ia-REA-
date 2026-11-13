@@ -147,6 +147,8 @@ def test_modes_share_the_screen_but_keep_their_own_conversation(tmp_path):
             await pilot.press("ctrl+t")            # REA -> Codex
             await pilot.pause(0.1)
             assert app.current.key == "codex"
+            # Codex est un agent avec outils : sa réponse passe par chat(), pas chat_stream()
+            FakeClient.script = [{"role": "assistant", "content": CODE_REPLY}]
             await type_and_send(pilot, "bonjour")
             await wait_idle(app, pilot)
             assert entry_kinds(app, "codex")[-2:] == ["user", "ai"]
