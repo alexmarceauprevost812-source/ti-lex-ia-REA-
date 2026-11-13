@@ -124,13 +124,13 @@ def test_code_theme_is_neon_on_black():
 
 
 # ----------------------------------------------------------------------- l'application
-def test_starts_black_in_rea_with_three_tabs(tmp_path):
+def test_starts_black_in_rea_with_four_tabs(tmp_path):
     async def scenario():
         app, _ = make_app(tmp_path)
         async with app.run_test(size=(140, 40)) as pilot:
             await pilot.pause(0.2)
             assert app.current.key == "rea"
-            assert [t.id for t in app.query("Tab")] == ["rea", "codex", "chat"]
+            assert [t.id for t in app.query("Tab")] == ["rea", "codex", "chat", "heretic"]
             assert app.theme == "lexos-noir"
             assert app.screen.styles.background.hex.lower() == "#000000"
             assert app.focused.id == "prompt"
@@ -546,7 +546,7 @@ def test_accueil_echap_passe_l_animation_et_cloner_prepare_la_commande(tmp_path)
             await pilot.press("escape")
             await pilot.pause()
             assert app.screen.query_one("#splash-menu").option_count == len(tui.MENU_CHOICES)
-            await pilot.press("5")
+            await pilot.press("6")
             await pilot.pause()
             assert app.query_one("#prompt", Input).value == "/cloner "
     run(go())
@@ -601,4 +601,30 @@ def test_cloner_adresse_refusee(tmp_path):
             assert any(e.kind == "error" and "non reconnue" in e.text
                        for e in app.current.transcript)
             assert list(ws.iterdir()) == []
+    run(go())
+
+
+def test_heretic_est_un_onglet_et_un_choix_du_menu_d_accueil(tmp_path, monkeypatch):
+    monkeypatch.setenv("TILEX_HERETIC_MODEL", "heretic:latest")
+    assert "heretic" in [k for k, _, _ in tui.MENU_CHOICES]
+
+    async def go():
+        app, _ = make_app(tmp_path, resolve_models=False, splash=True)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            await pilot.press("escape")                    # passe l'animation
+            await pilot.pause()
+            await pilot.press("4")                         # 4e choix : Heretic
+            await pilot.pause()
+            assert app.current.key == "heretic"
+            assert app.current.model == "heretic:latest" and not app.current.tools
+            await type_and_send(pilot, "salut")
+            await wait_idle(app, pilot)
+            assert entry_kinds(app, "heretic")[-2:] == ["user", "ai"]
+            assert FakeClient.stream_chunks and app.modes["heretic"].client.seen_models[-1] == "heretic:latest"
+            await type_and_send(pilot, "/rea")
+            await pilot.pause(0.2)
+            await type_and_send(pilot, "/heretic")
+            await pilot.pause(0.2)
+            assert app.current.key == "heretic"
     run(go())

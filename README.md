@@ -153,11 +153,12 @@ la commande et afficherait l'ancien menu) ; une sauvegarde `.ti-lex.bak` est fai
 `ti-lex` prend `marceau-ia` pour REA et Codex et `asselin` pour Chat — changeable avec
 `TILEX_REA_MODEL`, `TILEX_CODEX_MODEL`, `TILEX_CHAT_MODEL`.)
 
-Une seule fenêtre de terminal pour REA, Codex et Chat : **seul le moteur change** (modèle,
-outils, consigne). Heretic reste dans le menu `lexos-ia`, inchangé.
+Une seule fenêtre de terminal pour REA, Codex, Chat et Heretic : **seul le moteur change** (modèle,
+outils, consigne). Heretic (`/heretic`, `TILEX_HERETIC_MODEL`, défaut `heretic:latest`) est un chat
+direct sans outils ; le menu `lexos-ia` existe toujours.
 
 - Thème noir : ce que tu écris en blanc, les réponses de l'IA en bleu ciel, le code en couleurs néon.
-- Onglets REA / Codex / Chat (clic, `Ctrl+T`, ou `/rea` `/codex` `/chat`) — chaque mode garde sa
+- Onglets REA / Codex / Chat / Heretic (clic, `Ctrl+T`, ou `/rea` `/codex` `/chat` `/heretic`) — chaque mode garde sa
   propre conversation.
 - Panneau de fichiers à gauche (`Ctrl+B`) : un clic sur un fichier l'ouvre dans l'aperçu coloré à
   droite (`Ctrl+O`). Quand REA écrit un fichier, il apparaît dans la liste et s'ouvre tout seul.
