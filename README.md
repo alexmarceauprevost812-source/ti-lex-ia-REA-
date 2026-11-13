@@ -146,6 +146,9 @@ ti-lex                                # ouvre l'interface, depuis n'importe quel
 ti-lex --workspace ~/projet           # choisir le dossier de travail
 ```
 
+L'installeur retire aussi tout ancien `alias ti-lex` de ton `.bashrc`/`.zshrc` (un alias passe avant
+la commande et afficherait l'ancien menu) ; une sauvegarde `.ti-lex.bak` est faite.
+
 (Sans le raccourci : `lexos-tui`, après `pip install -e .` et avec le venv activé. Par défaut
 `ti-lex` prend `marceau-ia` pour REA et Codex et `asselin` pour Chat — changeable avec
 `TILEX_REA_MODEL`, `TILEX_CODEX_MODEL`, `TILEX_CHAT_MODEL`.)

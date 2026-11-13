@@ -60,3 +60,23 @@ def test_shortcut_explains_when_not_installed(tmp_path):
                           text=True, env=env)
     assert done.returncode == 1
     assert "pip install -e ." in done.stderr
+
+
+def test_install_removes_old_ti_lex_alias_that_would_hide_the_command(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / "scripts").mkdir(parents=True)
+    shutil.copy(SCRIPT, repo / "scripts" / "installer-raccourci.sh")
+    home = tmp_path / "home"
+    home.mkdir()
+    bashrc = home / ".bashrc"
+    bashrc.write_text("export A=1\n\n# >>> lexos (ti-lex) >>>\n"
+                      "alias ti-lex='PYTHONPATH=\"/vieux\" python3 -m lexos'\n"
+                      "alias lexos='ti-lex'\n# <<< lexos (ti-lex) <<<\nexport B=2\n")
+    env = {**os.environ, "HOME": str(home)}
+    for _ in range(2):                                   # relançable sans risque
+        subprocess.run(["bash", str(repo / "scripts" / "installer-raccourci.sh")],
+                       check=True, capture_output=True, text=True, env=env)
+    texte = bashrc.read_text()
+    assert "alias ti-lex" not in texte and "alias lexos" not in texte
+    assert "export A=1" in texte and "export B=2" in texte   # le reste n'est pas touché
+    assert (home / ".bashrc.ti-lex.bak").is_file()

@@ -28,6 +28,18 @@ exec "$REPO/.venv/bin/lexos-tui" "\$@"
 EOF
 chmod +x "$BIN/ti-lex"
 
+# Un ancien « alias ti-lex » (ex : de l'ancien petit menu terminal-lexos-pro) passe AVANT la
+# commande installée ci-dessus : on le retire pour que « ti-lex » ouvre bien cette interface.
+for RC in "${HOME}/.bashrc" "${HOME}/.zshrc" "${HOME}/.bash_aliases" "${HOME}/.profile"; do
+    [ -f "$RC" ] || continue
+    if grep -qE '^[[:space:]]*(alias (ti-lex|lexos)=|# >>> lexos \(ti-lex\) >>>)' "$RC"; then
+        cp "$RC" "$RC.ti-lex.bak"
+        sed -i -e '/# >>> lexos (ti-lex) >>>/,/# <<< lexos (ti-lex) <<</d' \
+               -e '/^[[:space:]]*alias ti-lex=/d' -e '/^[[:space:]]*alias lexos=/d' "$RC"
+        echo "(Ancien alias ti-lex retiré de $RC — sauvegarde : $RC.ti-lex.bak)"
+    fi
+done
+
 case ":$PATH:" in
     *":$BIN:"*) ;;
     *)
